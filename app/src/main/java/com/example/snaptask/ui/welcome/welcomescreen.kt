@@ -161,7 +161,7 @@ private fun WelcomeEmblem() {
             animation = keyframes {
                 durationMillis = 2000
                 0f at 0 using FigmaEaseInOut
-                -6f at 800 using FigmaEaseInOut
+                (-6f) at 800 using FigmaEaseInOut
                 0f at 1600
                 0f at 2000
             },
