@@ -1,0 +1,887 @@
+{
+  "info": {
+    "_postman_id": "snaptask-api-collection-v1",
+    "name": "SnapTask REST API & AI Service",
+    "description": "Comprehensive Postman test collection for SnapTask backend and AI microservice.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Public Root Status",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8000/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Success is true', function () { var res = pm.response.json(); pm.expect(res.success).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "API v1 Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('API is healthy', function () { var res = pm.response.json(); pm.expect(res.data.status).to.eql('healthy'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Python AI Microservice Health",
+          "request": {
+            "method": "GET",
+            "url": "{{ai_base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('AI service online', function () { var res = pm.response.json(); pm.expect(res.online).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sarah Jenkins\",\n  \"email\": \"sarah.jenkins@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Demo User)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"{{demo_password}}\",\n  \"device_name\": \"Pixel 8 Pro\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login status 200', function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test('Tokens returned', function () {",
+                  "  pm.expect(res.data.access_token).to.be.a('string');",
+                  "  pm.expect(res.data.refresh_token).to.be.a('string');",
+                  "  pm.environment.set('access_token', res.data.access_token);",
+                  "  pm.environment.set('refresh_token', res.data.refresh_token);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Authenticated User (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('User ID returned', function () { var res = pm.response.json(); pm.expect(res.data.user.id).to.be.a('number'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  var res = pm.response.json();",
+                  "  pm.environment.set('access_token', res.data.access_token);",
+                  "  pm.environment.set('refresh_token', res.data.refresh_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alex Taylor Updated\"\n}"
+            },
+            "url": "{{base_url}}/auth/profile"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"Password123!\",\n  \"new_password\": \"Password123!\"\n}"
+            },
+            "url": "{{base_url}}/auth/change-password"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. User Settings & Preferences",
+      "item": [
+        {
+          "name": "Get General Settings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings"
+          }
+        },
+        {
+          "name": "Update General Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cleanup_reminders_enabled\": true,\n  \"cleanup_summaries_enabled\": false,\n  \"protect_kept_screenshots\": true\n}"
+            },
+            "url": "{{base_url}}/settings"
+          }
+        },
+        {
+          "name": "Get Automation Settings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings/automation"
+          }
+        },
+        {
+          "name": "Update Automation Mode (Daily vs Manual)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"daily\",\n  \"daily_time\": \"09:00:00\"\n}"
+            },
+            "url": "{{base_url}}/settings/automation"
+          }
+        },
+        {
+          "name": "Get Cleanup Rules",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings/cleanup-rules"
+          }
+        },
+        {
+          "name": "Create Cleanup Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rule_name\": \"Custom Tickets Rule\",\n  \"item_type\": \"tickets\",\n  \"retention_days\": 2,\n  \"notify_days_before\": 1\n}"
+            },
+            "url": "{{base_url}}/settings/cleanup-rules"
+          }
+        },
+        {
+          "name": "Update Cleanup Rule",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"retention_days\": 3,\n  \"is_active\": true\n}"
+            },
+            "url": "{{base_url}}/settings/cleanup-rules/{{rule_id}}"
+          }
+        },
+        {
+          "name": "Delete Cleanup Rule",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings/cleanup-rules/{{rule_id}}"
+          }
+        },
+        {
+          "name": "Get Privacy Controls",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings/privacy"
+          }
+        },
+        {
+          "name": "Update Privacy Controls",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ai_organization_enabled\": true,\n  \"share_analytics\": false\n}"
+            },
+            "url": "{{base_url}}/settings/privacy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Screenshot Management",
+      "item": [
+        {
+          "name": "List Screenshots (Paginated & Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/screenshots?page=1&limit=20&category=dated",
+              "host": ["{{base_url}}"],
+              "path": ["screenshots"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "category", "value": "dated" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Screenshot By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}"
+          }
+        },
+        {
+          "name": "Update Screenshot (Keep / Edit)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_kept\": true,\n  \"extracted_title\": \"Jazz at the Garden (Protected)\"\n}"
+            },
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}"
+          }
+        },
+        {
+          "name": "Analyze Screenshot With AI Pipeline",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}/analyze"
+          }
+        },
+        {
+          "name": "Bulk Analyze Screenshots",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenshot_ids\": [1, 2, 3]\n}"
+            },
+            "url": "{{base_url}}/screenshots/bulk-analyze"
+          }
+        },
+        {
+          "name": "Search Screenshots",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/screenshots/search?query=jazz",
+              "host": ["{{base_url}}"],
+              "path": ["screenshots", "search"],
+              "query": [{ "key": "query", "value": "jazz" }]
+            }
+          }
+        },
+        {
+          "name": "Get Screenshot Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/stats"
+          }
+        },
+        {
+          "name": "Move Screenshot to Trash",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Dated Items",
+      "item": [
+        {
+          "name": "List Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items?sort=date_asc"
+          }
+        },
+        {
+          "name": "Get Overdue Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/overdue"
+          }
+        },
+        {
+          "name": "Get This Week Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/this-week"
+          }
+        },
+        {
+          "name": "Get Upcoming Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/upcoming"
+          }
+        },
+        {
+          "name": "Get Dated Item By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}"
+          }
+        },
+        {
+          "name": "Update Dated Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": \"high\",\n  \"event_time\": \"20:00:00\"\n}"
+            },
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}"
+          }
+        },
+        {
+          "name": "Mark Dated Item Complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}/complete"
+          }
+        },
+        {
+          "name": "Snooze Dated Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"snooze_until\": \"2026-10-16 12:00:00\"\n}"
+            },
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}/snooze"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Non-Dated Items",
+      "item": [
+        {
+          "name": "List Non-Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items?sort=oldest"
+          }
+        },
+        {
+          "name": "Search Non-Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items/search?query=lamp"
+          }
+        },
+        {
+          "name": "Get Non-Dated Item By ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items/{{non_dated_item_id}}"
+          }
+        },
+        {
+          "name": "Favorite Non-Dated Item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items/{{non_dated_item_id}}/favorite"
+          }
+        },
+        {
+          "name": "Remove Favorite",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items/{{non_dated_item_id}}/favorite"
+          }
+        },
+        {
+          "name": "Add Tag to Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lighting Wishlist\",\n  \"color\": \"#721D38\"\n}"
+            },
+            "url": "{{base_url}}/non-dated-items/{{non_dated_item_id}}/tags"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Reminders",
+      "item": [
+        {
+          "name": "List All Reminders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders?filter=all"
+          }
+        },
+        {
+          "name": "List Overdue Reminders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders?filter=overdue"
+          }
+        },
+        {
+          "name": "List Today Reminders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders?filter=today"
+          }
+        },
+        {
+          "name": "Snooze Reminder (1 hour)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"minutes\": 60\n}"
+            },
+            "url": "{{base_url}}/reminders/{{reminder_id}}/snooze"
+          }
+        },
+        {
+          "name": "Complete Reminder",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders/{{reminder_id}}/complete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Notifications",
+      "item": [
+        {
+          "name": "Get Notifications List",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/notifications"
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/notifications/unread-count"
+          }
+        },
+        {
+          "name": "Mark Single Notification Read",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/notifications/{{notification_id}}/read"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/notifications/read-all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Cleanup Engine",
+      "item": [
+        {
+          "name": "Get Cleanup Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/cleanup/recommendations"
+          }
+        },
+        {
+          "name": "Review Eligible Screenshots",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenshot_ids\": [4, 5, 6, 7, 8, 9]\n}"
+            },
+            "url": "{{base_url}}/cleanup/review"
+          }
+        },
+        {
+          "name": "Confirm & Execute Cleanup",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenshot_ids\": [4, 5, 6],\n  \"mode\": \"manual\"\n}"
+            },
+            "url": "{{base_url}}/cleanup/confirm"
+          }
+        },
+        {
+          "name": "Get Cleanup History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/cleanup/history"
+          }
+        },
+        {
+          "name": "Get Cleanup Lifetime Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/cleanup/stats"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Trash & 30-Day Recovery",
+      "item": [
+        {
+          "name": "List Trash Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash"
+          }
+        },
+        {
+          "name": "Restore Single Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash/4/restore"
+          }
+        },
+        {
+          "name": "Restore All Trashed Screenshots",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash/restore-all"
+          }
+        },
+        {
+          "name": "Permanent Delete Single Item",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash/4"
+          }
+        },
+        {
+          "name": "Empty Trash Permanently",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash/empty"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Dashboard Hub",
+      "item": [
+        {
+          "name": "Complete Home Dashboard Package",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dashboard"
+          }
+        },
+        {
+          "name": "Dashboard Summary Metrics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dashboard/summary"
+          }
+        },
+        {
+          "name": "Dashboard Cleanup Insights",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dashboard/cleanup-insights"
+          }
+        },
+        {
+          "name": "Category Breakdown",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dashboard/category-breakdown"
+          }
+        },
+        {
+          "name": "Recent Activity Stream",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dashboard/recent-activity"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. AI Microservice Proxy",
+      "item": [
+        {
+          "name": "AI Microservice Health via PHP Proxy",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/ai/health"
+          }
+        },
+        {
+          "name": "Classify Screenshot Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ocr_text\": \"LIVE AT THE GARDEN JAZZ CONCERT FRI 16 OCT 2026 19:30 ADMIT ONE\"\n}"
+            },
+            "url": "{{base_url}}/ai/classify-screenshot"
+          }
+        },
+        {
+          "name": "Extract Dates & Times",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ocr_text\": \"Concert on 16 Oct 2026 at 19:30 in London\"\n}"
+            },
+            "url": "{{base_url}}/ai/extract-dates"
+          }
+        },
+        {
+          "name": "Extract Task Action Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ocr_text\": \"The Garden Live Jazz Admit One Total $45.00 USD\",\n  \"category\": \"dated\"\n}"
+            },
+            "url": "{{base_url}}/ai/extract-task"
+          }
+        },
+        {
+          "name": "Recommend Cleanup Evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenshot_id\": 1,\n  \"category\": \"dated\",\n  \"event_date\": \"2026-10-15\",\n  \"file_size\": 3145728\n}"
+            },
+            "url": "{{base_url}}/ai/recommend-cleanup"
+          }
+        }
+      ]
+    }
+  ]
+}
+
