@@ -2,11 +2,19 @@ package com.example.snaptask
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.snaptask.ui.auth.CreateAccountScreen
+import com.example.snaptask.ui.auth.LoginScreen
+import com.example.snaptask.ui.auth.MyProfileScreen
+import com.example.snaptask.ui.auth.ProfileSetupScreen
+import com.example.snaptask.ui.auth.SplashScreen
 import com.example.snaptask.ui.cleanup.CleanupInProgressScreen
 import com.example.snaptask.ui.cleanup.CleanupReviewScreen
 import com.example.snaptask.ui.cleanup.CleanupSuccessScreen
@@ -31,15 +39,26 @@ import com.example.snaptask.ui.settings.CleanupRulesScreen
 import com.example.snaptask.ui.settings.PermissionsPrivacyScreen
 import com.example.snaptask.ui.settings.SettingsScreen
 import com.example.snaptask.ui.welcome.WelcomeScreen
+import com.example.snaptask.viewmodel.AuthViewModel
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Navigation destinations
+// ─────────────────────────────────────────────────────────────────────────────
 private enum class Screen {
+    // ── Auth & onboarding ───────────────────────────────────────────────────
+    Splash,
     Welcome,
+    Login,
+    CreateAccount,
+    ProfileSetup,
+    // ── Existing onboarding (new-user only, runs after ProfileSetup) ────────
     Onboarding,
     HowDated,
     NonDated,
     GalleryPermission,
     AccessRecovery,
     ScreenshotScanning,
+    // ── Main app (authenticated) ────────────────────────────────────────────
     HomeDashboard,
     DatedScreenshots,
     NonDatedScreenshots,
@@ -56,30 +75,128 @@ private enum class Screen {
     AutomationSettings,
     CleanupRules,
     PermissionsPrivacy,
+    MyProfile,
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Root composable
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun SnapTaskApp() {
-    var screen by rememberSaveable { mutableStateOf(Screen.Welcome) }
+    val context = LocalContext.current
+    val app = context.applicationContext as SnapTaskApplication
 
-    fun handleBottomTab(tab: BottomTab) {
-        when (tab) {
-            BottomTab.Home -> screen = Screen.HomeDashboard
-            BottomTab.Library -> screen = Screen.DatedScreenshots
-            BottomTab.Reminders -> screen = Screen.Reminders
-            BottomTab.Settings -> screen = Screen.Settings
+    val authViewModel: AuthViewModel = viewModel(
+        factory = AuthViewModel.Factory(app.container.authRepository),
+    )
+    val authState by authViewModel.uiState.collectAsState()
+
+    var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
+
+    // ── Session resolved from Splash ─────────────────────────────────────────
+    // When AuthViewModel has finished its session check, redirect appropriately.
+    LaunchedEffect(authState.isLoggedIn) {
+        // Only act once we are still on the Splash screen.
+        if (screen == Screen.Splash) {
+            screen = if (authState.isLoggedIn) Screen.HomeDashboard else Screen.Splash
         }
     }
 
+    fun handleBottomTab(tab: BottomTab) {
+        screen = when (tab) {
+            BottomTab.Home -> Screen.HomeDashboard
+            BottomTab.Library -> Screen.DatedScreenshots
+            BottomTab.Reminders -> Screen.Reminders
+            BottomTab.Settings -> Screen.Settings
+        }
+    }
+
+    // Helper: log out and clear back-stack by going to Welcome
+    fun logout() {
+        authViewModel.logout()
+        screen = Screen.Welcome
+    }
+
+    // ── Screen routing ────────────────────────────────────────────────────────
     when (screen) {
-        Screen.Welcome -> WelcomeScreen(
-            onGetStarted = { screen = Screen.Onboarding },
+
+        // ── Splash ────────────────────────────────────────────────────────────
+        Screen.Splash -> SplashScreen(
+            onAuthenticated = { screen = Screen.HomeDashboard },
+            onUnauthenticated = {
+                // After splash delay: check real auth state
+                screen = if (authState.isLoggedIn) Screen.HomeDashboard else Screen.Welcome
+            },
         )
 
-        Screen.Onboarding -> {
+        // ── Welcome ───────────────────────────────────────────────────────────
+        Screen.Welcome -> {
+            // No back handler — Welcome is the root for unauthenticated users.
+            WelcomeScreen(
+                onGetStarted = { screen = Screen.CreateAccount },
+                onLogin = { screen = Screen.Login },
+            )
+        }
+
+        // ── Login ─────────────────────────────────────────────────────────────
+        Screen.Login -> {
             BackHandler { screen = Screen.Welcome }
-            OnboardingScreen(
+            LoginScreen(
                 onBack = { screen = Screen.Welcome },
+                onLoginSuccess = { screen = Screen.HomeDashboard },
+                onNavigateToCreateAccount = { screen = Screen.CreateAccount },
+                isLoading = authState.isLoading,
+                errorMessage = authState.error,
+                onLogin = { email, password ->
+                    authViewModel.login(email, password)
+                },
+            )
+            // Navigate to Home once login succeeds
+            LaunchedEffect(authState.isLoggedIn) {
+                if (authState.isLoggedIn) screen = Screen.HomeDashboard
+            }
+        }
+
+        // ── Create Account ────────────────────────────────────────────────────
+        Screen.CreateAccount -> {
+            BackHandler { screen = Screen.Welcome }
+            CreateAccountScreen(
+                onBack = { screen = Screen.Welcome },
+                onAccountCreated = { screen = Screen.ProfileSetup },
+                onNavigateToLogin = { screen = Screen.Login },
+                isLoading = authState.isLoading,
+                errorMessage = authState.error,
+                onRegister = { name, email, password ->
+                    authViewModel.register(name, email, password)
+                },
+            )
+            // After successful registration move to ProfileSetup
+            LaunchedEffect(authState.isLoggedIn) {
+                if (authState.isLoggedIn) screen = Screen.ProfileSetup
+            }
+        }
+
+        // ── Profile Setup (first-time registration only) ───────────────────────
+        Screen.ProfileSetup -> {
+            BackHandler { /* intentionally blocked — can't go back to registration */ }
+            ProfileSetupScreen(
+                onBack = { /* blocked */ },
+                onProfileSaved = {
+                    authViewModel.setOnboardingDone()
+                    screen = Screen.Onboarding
+                },
+                onSkip = {
+                    authViewModel.setOnboardingDone()
+                    screen = Screen.Onboarding
+                },
+            )
+        }
+
+        // ── Existing Onboarding (new users, after ProfileSetup) ──────────────
+        Screen.Onboarding -> {
+            BackHandler { /* blocked — cannot go back from onboarding to registration */ }
+            OnboardingScreen(
+                onBack = { /* blocked */ },
                 onHowItWorks = { screen = Screen.HowDated },
             )
         }
@@ -126,8 +243,10 @@ fun SnapTaskApp() {
             )
         }
 
+        // ── Main App (authenticated) ──────────────────────────────────────────
         Screen.HomeDashboard -> {
-            BackHandler { screen = Screen.ScreenshotScanning }
+            // Prevent going back to auth screens after login
+            BackHandler { /* blocked — Home is the authenticated root */ }
             HomeDashboardScreen(
                 onTakeAction = { screen = Screen.CleanupReview },
                 onOpenDated = { screen = Screen.DatedScreenshots },
@@ -246,6 +365,8 @@ fun SnapTaskApp() {
                 onOpenRecentlyDeleted = { screen = Screen.RecentlyDeleted },
                 onOpenPermissions = { screen = Screen.PermissionsPrivacy },
                 onTabSelected = ::handleBottomTab,
+                // Pass profile entry point to Settings
+                onOpenProfile = { screen = Screen.MyProfile },
             )
         }
 
@@ -275,11 +396,16 @@ fun SnapTaskApp() {
                 onTabSelected = ::handleBottomTab,
             )
         }
-    }
-}
 
-@Preview(showBackground = true, widthDp = 412, heightDp = 892)
-@Composable
-private fun SnapTaskAppPreview() {
-    SnapTaskApp()
+        // ── My Profile (account management — not registration) ────────────────
+        Screen.MyProfile -> {
+            BackHandler { screen = Screen.Settings }
+            MyProfileScreen(
+                onBack = { screen = Screen.Settings },
+                onLogout = ::logout,
+                userName = authState.userName ?: "",
+                userEmail = authState.userEmail ?: "",
+            )
+        }
+    }
 }

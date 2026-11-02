@@ -72,6 +72,7 @@ fun SettingsScreen(
     onOpenRecentlyDeleted: () -> Unit,
     onOpenPermissions: () -> Unit,
     onTabSelected: (BottomTab) -> Unit,
+    onOpenProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var remindersChecked by remember { mutableStateOf(true) }

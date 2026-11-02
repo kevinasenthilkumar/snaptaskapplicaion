@@ -1,12 +1,13 @@
 package com.example.snaptask.data.network
 
+import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 
 data class ApiResponse<T>(
     @SerializedName("success") val success: Boolean,
     @SerializedName("message") val message: String,
     @SerializedName("data") val data: T?,
-    @SerializedName("errors") val errors: List<String>? = null,
+    @SerializedName("errors") val errors: JsonElement? = null,
     @SerializedName("meta") val meta: MetaData? = null,
     @SerializedName("error_code") val errorCode: String? = null,
 )

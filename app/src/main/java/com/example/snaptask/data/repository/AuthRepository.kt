@@ -2,7 +2,9 @@ package com.example.snaptask.data.repository
 
 import com.example.snaptask.data.local.PreferencesManager
 import com.example.snaptask.data.network.*
+import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.first
+import retrofit2.Response
 
 class AuthRepository(
     private val apiService: ApiService,
@@ -16,7 +18,8 @@ class AuthRepository(
                 prefsManager.saveAuthData(authData.accessToken, authData.refreshToken, authData.user)
                 Resource.Success(authData)
             } else {
-                Resource.Error(response.body()?.message ?: "Login failed")
+                val errorMsg = response.body()?.message ?: parseErrorMessage(response)
+                Resource.Error(errorMsg)
             }
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Network error")
@@ -31,10 +34,26 @@ class AuthRepository(
                 prefsManager.saveAuthData(authData.accessToken, authData.refreshToken, authData.user)
                 Resource.Success(authData)
             } else {
-                Resource.Error(response.body()?.message ?: "Registration failed")
+                val errorMsg = response.body()?.message ?: parseErrorMessage(response)
+                Resource.Error(errorMsg)
             }
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Network error")
+        }
+    }
+
+    private fun parseErrorMessage(response: Response<*>): String {
+        return try {
+            val errorJson = response.errorBody()?.string()
+            if (!errorJson.isNullOrBlank()) {
+                val jsonObject = JsonParser.parseString(errorJson).asJsonObject
+                if (jsonObject.has("message")) {
+                    return jsonObject.get("message").asString
+                }
+            }
+            "Request failed (${response.code()})"
+        } catch (_: Exception) {
+            "Request failed (${response.code()})"
         }
     }
 

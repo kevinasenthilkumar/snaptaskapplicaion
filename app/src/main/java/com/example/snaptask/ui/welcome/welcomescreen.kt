@@ -35,15 +35,26 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.snaptask.R
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
+import com.example.snaptask.ui.components.SnapTaskSecondaryButton
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
 
 // CSS "ease-in-out" used by the Figma animation
 private val FigmaEaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)
 
+/**
+ * Welcome Screen — the entry point for unauthenticated users.
+ *
+ * Provides two actions:
+ *  - [onGetStarted] → Create Account flow (new users)
+ *  - [onLogin] → Login flow (returning users)
+ *
+ * Preserves all original animations and brand visuals.
+ */
 @Composable
 fun WelcomeScreen(
     onGetStarted: () -> Unit,
+    onLogin: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -72,7 +83,7 @@ fun WelcomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "Meet SnapTask. Your screenshots, neatly organized by AI and ready for what’s next.",
+                text = "Meet SnapTask. Your screenshots, neatly organized by AI and ready for what's next.",
                 style = SnapTaskType.Body,
                 color = SnapTaskColors.TextSecondary,
                 modifier = Modifier.fillMaxWidth(),
@@ -80,11 +91,19 @@ fun WelcomeScreen(
 
             Spacer(Modifier.weight(1f))
 
+            // Primary CTA — new user
             SnapTaskPrimaryButton(
                 label = "Get started",
                 onClick = onGetStarted,
                 leadingIcon = painterResource(R.drawable.ic_arrow_right),
             )
+
+            // Secondary CTA — returning user
+            SnapTaskSecondaryButton(
+                label = "Sign in",
+                onClick = onLogin,
+            )
+
             Text(
                 text = "Your memories stay yours. You stay in control.",
                 style = SnapTaskType.Caption,
@@ -187,7 +206,7 @@ private fun WelcomeEmblem() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(280.dp)
             .clipToBounds(),
     ) {
         Image(
@@ -219,7 +238,7 @@ private fun WelcomeEmblem() {
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .offset(x = 23.dp, y = 223.dp)
+                .offset(x = 23.dp, y = 210.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(SnapTaskColors.Surface)
                 .padding(12.dp),
@@ -260,5 +279,5 @@ private fun MascotNook() {
 @Preview(showBackground = true, widthDp = 412, heightDp = 892)
 @Composable
 private fun WelcomeScreenPreview() {
-    WelcomeScreen(onGetStarted = {})
+    WelcomeScreen(onGetStarted = {}, onLogin = {})
 }

@@ -100,8 +100,7 @@
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"{{demo_password}}\",\n  \"device_name\": \"Pixel 8 Pro\"\n}"
+               "raw": "{\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"{{demo_password}}\",\n  \"device_name\": \"Pixel 8 Pro\"\n}"
             },
             "url": "{{base_url}}/auth/login"
           },
