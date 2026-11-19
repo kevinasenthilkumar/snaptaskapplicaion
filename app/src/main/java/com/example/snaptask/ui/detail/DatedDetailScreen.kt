@@ -21,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -34,21 +36,28 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.snaptask.R
+import com.example.snaptask.data.local.LocalScreenshotEntity
 import com.example.snaptask.ui.components.BottomTab
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskBottomNavigation
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
-import com.example.snaptask.ui.theme.InterFamily
+import com.example.snaptask.ui.components.formatFileSize
+import com.example.snaptask.ui.components.getCategoryIcon
+import com.example.snaptask.ui.theme.AppFontFamily
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private fun inter(
     size: TextUnit,
     weight: FontWeight = FontWeight.Normal,
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) = TextStyle(
-    fontFamily = InterFamily,
+    fontFamily = AppFontFamily,
     fontWeight = weight,
     fontSize = size,
     lineHeight = lineHeight,
@@ -62,12 +71,23 @@ private val CardMeta = inter(12.sp, lineHeight = 18.sp)
 
 @Composable
 fun DatedDetailScreen(
+    screenshot: LocalScreenshotEntity? = null,
     onBack: () -> Unit,
-    onKeepThis: () -> Unit,
-    onTakeAction: () -> Unit,
+    onKeepThis: () -> Unit = {},
+    onTakeAction: () -> Unit = {},
+    onDelete: (Long) -> Unit = {},
     onTabSelected: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val capturedDateStr = remember(screenshot?.capturedAt) {
+        val captured = screenshot?.capturedAt
+        if (captured != null && captured > 0) {
+            SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(captured * 1000L))
+        } else {
+            "Recent"
+        }
+    }
+
     DoodleBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -85,28 +105,54 @@ fun DatedDetailScreen(
                     .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                // Ticket Preview Card
+                // Screenshot Preview Box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(220.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF3C1524))
-                        .padding(20.dp),
+                        .background(Color(0xFF3C1524)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(text = "THE GARDEN • LIVE", style = inter(11.sp), color = Color(0xFFE5B6C3))
-                        Text(text = "JAZZ AT\nTHE GARDEN", style = inter(24.sp, FontWeight.Bold), color = Color.White)
-                        Text(text = "FRI 16 OCT 2026 • 19:30", style = inter(12.sp), color = Color(0xFFE5B6C3))
+                    if (screenshot?.contentUri != null) {
+                        AsyncImage(
+                            model = screenshot.contentUri,
+                            contentDescription = screenshot.displayName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(text = "PREVIEW", style = inter(11.sp), color = Color(0xFFE5B6C3))
+                            Text(text = "Screenshot", style = inter(24.sp, FontWeight.Bold), color = Color.White)
+                        }
                     }
                 }
 
-                Text(text = "Jazz at the Garden", style = Heading, color = SnapTaskColors.TextPrimary)
+                Text(
+                    text = screenshot?.displayName ?: "Screenshot details",
+                    style = Heading,
+                    color = SnapTaskColors.TextPrimary
+                )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DetailChip(label = "Dated", filled = true)
-                    DetailChip(label = "Tickets", filled = false)
-                    DetailChip(label = "Edit category ✏️", filled = false)
+                    DetailChip(
+                        label = if (screenshot?.eventDate != null) "Dated" else "Classified",
+                        filled = true
+                    )
+                    DetailChip(
+                        label = screenshot?.category ?: "Tickets",
+                        filled = false
+                    )
+                    if (screenshot != null && screenshot.confidence > 0f) {
+                        DetailChip(
+                            label = "${(screenshot.confidence * 100).toInt()}% match",
+                            filled = false
+                        )
+                    }
                 }
 
                 Column(
@@ -118,21 +164,25 @@ fun DatedDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     DetailRow(
-                        iconRes = R.drawable.ic_nav_home,
-                        title = "Event · 16 Oct 2026",
-                        subtitle = "Today at 19:30 · Edit detected date",
-                        actionIcon = R.drawable.ic_edit,
-                    )
-                    DetailRow(
-                        iconRes = R.drawable.ic_bell,
-                        title = "Notify · 16 Oct 2026",
-                        subtitle = "On the specified date, one day before deletion.",
+                        iconRes = getCategoryIcon(screenshot?.category ?: "Tickets"),
+                        title = "Category · ${screenshot?.category ?: "Tickets"}",
+                        subtitle = if (!screenshot?.ocrText.isNullOrBlank())
+                            screenshot!!.ocrText!!.take(80).replace("\n", " ")
+                        else "Detected via on-device AI",
                         actionIcon = R.drawable.ic_chevron_right,
                     )
+                    if (screenshot?.eventDate != null) {
+                        DetailRow(
+                            iconRes = R.drawable.ic_nav_home,
+                            title = "Event · ${screenshot.eventDate}",
+                            subtitle = if (screenshot.eventTime != null) "Time: ${screenshot.eventTime}" else "Detected date in screenshot",
+                            actionIcon = R.drawable.ic_chevron_right,
+                        )
+                    }
                     DetailRow(
-                        iconRes = R.drawable.ic_trash,
-                        title = "Delete · 17 Oct 2026",
-                        subtitle = "One day after the event date.",
+                        iconRes = R.drawable.ic_nav_library,
+                        title = "Captured · $capturedDateStr",
+                        subtitle = "Size: ${formatFileSize(screenshot?.size ?: 0L)}",
                         actionIcon = R.drawable.ic_chevron_right,
                     )
                 }
@@ -169,14 +219,21 @@ fun DatedDetailScreen(
                     }
 
                     SnapTaskPrimaryButton(
-                        label = "Take Action",
-                        onClick = onTakeAction,
+                        label = "Delete",
+                        leadingIcon = painterResource(R.drawable.ic_trash),
+                        onClick = {
+                            if (screenshot != null) {
+                                onDelete(screenshot.id)
+                            } else {
+                                onTakeAction()
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
 
                 Text(
-                    text = "Saved 12 Oct · Automatic cleanup off · Not deleted",
+                    text = "Saved · Tap Delete to request approval from gallery",
                     style = SnapTaskType.Caption,
                     color = SnapTaskColors.TextSecondary,
                     textAlign = TextAlign.Center,

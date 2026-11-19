@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace App\Controllers;
 
@@ -87,15 +86,7 @@ class AuthController
     public function me(Request $request): void
     {
         $user = $request->getUser();
-        Response::json([
-            'user' => [
-                'id' => (int)$user->id,
-                'email' => $user->email,
-                'name' => $user->name,
-                'avatar_url' => $user->avatar_url,
-                'status' => $user->status,
-            ],
-        ], 'Authenticated user profile');
+        Response::json($user->toArray(), 'Authenticated user profile');
     }
 
     public function updateProfile(Request $request): void
@@ -107,7 +98,7 @@ class AuthController
         }
 
         $user = $this->authService->updateProfile($request->getUserId(), $validator->validated());
-        Response::json(['user' => $user->toArray()], 'Profile updated successfully');
+        Response::json($user->toArray(), 'Profile updated successfully');
     }
 
     public function changePassword(Request $request): void
@@ -129,4 +120,3 @@ class AuthController
         }
     }
 }
-

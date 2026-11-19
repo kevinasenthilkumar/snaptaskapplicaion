@@ -1,0 +1,64 @@
+-- ============================================================
+-- Migration: 001_auth_profile_update.sql
+-- Date: 2026-11-03
+-- Author: SnapTask Backend Team
+-- ============================================================
+-- STATUS: NO SCHEMA CHANGES REQUIRED
+-- ============================================================
+--
+-- The existing `snaptask_db` schema already fully supports
+-- the Android authentication implementation.
+--
+-- Verification performed on 2026-11-03:
+--
+-- ✅ users.id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY
+-- ✅ users.email         VARCHAR(255) UNIQUE NOT NULL
+-- ✅ users.password_hash VARCHAR(255) NOT NULL  (bcrypt hash, never plaintext)
+-- ✅ users.name          VARCHAR(120) NOT NULL
+-- ✅ users.avatar_url    VARCHAR(500) NULL
+-- ✅ users.status        ENUM('active','suspended','deleted') DEFAULT 'active'
+-- ✅ users.created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- ✅ users.updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+--
+-- Android UserDto fields mapped:
+--   id           → users.id
+--   email        → users.email
+--   name         → users.name
+--   avatar_url   → users.avatar_url   (nullable ✅)
+--   status       → users.status
+--   created_at   → users.created_at
+--
+-- ✅ user_sessions table exists with:
+--   token_id, refresh_token_hash, device_name, ip_address,
+--   user_agent, expires_at, created_at
+--   → Supports device_name from Android LoginRequest.device_name
+--   → Supports refresh token rotation via deleteSessionByTokenId()
+--   → Supports full logout via deleteAllSessions(userId)
+--
+-- ============================================================
+-- BACKEND FIXES APPLIED (PHP only, no SQL needed):
+-- ============================================================
+--
+-- FIX 1 (AuthController::me):
+--   BEFORE: Response::json(['user' => [...]], 'Authenticated user profile')
+--   AFTER:  Response::json($user->toArray(), 'Authenticated user profile')
+--   REASON: Android ApiResponse<UserDto> expects data to BE the UserDto
+--           directly, not wrapped under a 'user' key.
+--
+-- FIX 2 (AuthController::updateProfile):
+--   BEFORE: Response::json(['user' => $user->toArray()], 'Profile updated...')
+--   AFTER:  Response::json($user->toArray(), 'Profile updated successfully')
+--   REASON: Same as above — Android expects ApiResponse<UserDto> with
+--           data = UserDto fields directly.
+--
+-- FIX 3 (AuthService::register and AuthService::login):
+--   ADDED:  'token_type' => 'Bearer' to return arrays
+--   REASON: Android AuthResponse model has token_type field (nullable,
+--           default "Bearer"). Adding it ensures full model alignment.
+--
+-- ============================================================
+-- NO SQL STATEMENTS TO EXECUTE IN THIS MIGRATION.
+-- This file is documentation only.
+-- ============================================================
+SELECT 'Migration 001: Schema already compatible — no changes needed.' AS migration_status;
+

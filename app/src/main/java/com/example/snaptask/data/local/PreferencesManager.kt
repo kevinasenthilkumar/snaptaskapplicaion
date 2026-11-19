@@ -24,6 +24,7 @@ class PreferencesManager(private val context: Context) {
         private val KEY_USER_EMAIL = stringPreferencesKey("user_email")
         private val KEY_IS_LOGGED_IN = booleanPreferencesKey("is_logged_in")
         private val KEY_ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
+        private val KEY_INTRO_SEEN = booleanPreferencesKey("intro_seen")
     }
 
     val accessToken: Flow<String?> = context.dataStore.data.map { it[KEY_ACCESS_TOKEN] }
@@ -33,6 +34,7 @@ class PreferencesManager(private val context: Context) {
     val userEmail: Flow<String?> = context.dataStore.data.map { it[KEY_USER_EMAIL] }
     val isLoggedIn: Flow<Boolean> = context.dataStore.data.map { it[KEY_IS_LOGGED_IN] ?: false }
     val onboardingDone: Flow<Boolean> = context.dataStore.data.map { it[KEY_ONBOARDING_DONE] ?: false }
+    val introSeen: Flow<Boolean> = context.dataStore.data.map { it[KEY_INTRO_SEEN] ?: false }
 
     suspend fun saveAuthData(accessToken: String, refreshToken: String, user: UserDto) {
         context.dataStore.edit { prefs ->
@@ -59,6 +61,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setOnboardingDone() {
         context.dataStore.edit { prefs ->
             prefs[KEY_ONBOARDING_DONE] = true
+        }
+    }
+
+    suspend fun setIntroSeen() {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_INTRO_SEEN] = true
         }
     }
 }

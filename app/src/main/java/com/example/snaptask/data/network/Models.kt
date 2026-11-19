@@ -27,6 +27,10 @@ data class CreateNonDatedItemRequest(
     @SerializedName("screenshot_id") val screenshotId: Long? = null,
 )
 
+data class UploadScreenshotResponse(
+    @SerializedName("screenshot") val screenshot: ScreenshotDto?,
+)
+
 data class ScreenshotDto(
     @SerializedName("id") val id: Long,
     @SerializedName("user_id") val userId: Long,

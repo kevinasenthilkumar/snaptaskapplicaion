@@ -22,11 +22,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -35,13 +38,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.snaptask.R
+import com.example.snaptask.data.local.LocalScreenshotEntity
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskInfoNote
 import com.example.snaptask.ui.components.SnapTaskSecondaryButton
 import com.example.snaptask.ui.theme.InterFamily
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
+import com.example.snaptask.viewmodel.ScanUiState
 
 private object ScanningColors {
     val TicketBackground = Color(0xFF3C1524)
@@ -73,17 +79,29 @@ private val ProgressPercentage = inter(14.sp, FontWeight.SemiBold)
 private val ProgressStatus = inter(12.sp, lineHeight = 18.sp)
 private val RowTitle = inter(14.sp, FontWeight.SemiBold, 21.sp)
 private val RowSubtitle = inter(12.sp, lineHeight = 18.sp)
-private val Mini5 = inter(5.sp)
-private val Mini8 = inter(8.sp)
-
-private val BarcodeWidths = listOf(3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1)
 
 @Composable
 fun ScreenshotScanningScreen(
     onBack: () -> Unit,
     onCancelScan: () -> Unit,
+    scanUiState: ScanUiState,
+    onStartScan: () -> Unit,
+    onScanComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isPreview = LocalInspectionMode.current
+    if (!isPreview) {
+        LaunchedEffect(Unit) {
+            onStartScan()
+        }
+
+        LaunchedEffect(scanUiState.isComplete) {
+            if (scanUiState.isComplete) {
+                onScanComplete()
+            }
+        }
+    }
+
     DoodleBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -118,10 +136,28 @@ fun ScreenshotScanningScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
-                ScreenshotCollection()
-                ProgressCard(current = 84, total = 128, progress = 0.66f)
-                ScanningDetailsCard()
-                SnapTaskInfoNote(text = "This is a scanning preview. No device gallery has been accessed.")
+                RealScreenshotPreviews(screenshots = scanUiState.recentScreenshots)
+
+                ProgressCard(
+                    current = scanUiState.scannedCount,
+                    total = scanUiState.totalCount,
+                    progress = scanUiState.progress,
+                    statusText = scanUiState.statusText,
+                )
+
+                ScanningDetailsCard(
+                    totalFound = scanUiState.totalCount,
+                    uploaded = scanUiState.uploadedCount,
+                    failed = scanUiState.failedCount,
+                    remaining = scanUiState.remainingCount,
+                )
+
+                SnapTaskInfoNote(
+                    text = if (scanUiState.totalCount > 0)
+                        "Processing & uploading ${scanUiState.totalCount} actual screenshots to your library."
+                    else
+                        "Scanning device storage for real screenshots..."
+                )
 
                 Spacer(Modifier.weight(1f))
 
@@ -172,81 +208,33 @@ private fun ScanningAppBar(onBack: () -> Unit) {
 }
 
 @Composable
-private fun ScreenshotCollection() {
+private fun RealScreenshotPreviews(screenshots: List<LocalScreenshotEntity>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
     ) {
-        TicketPreview()
-        PhotoPreview(
-            background = ScanningColors.LampCard,
-            brand = "FORM & FIELD",
-            photo = R.drawable.img_screenshot_lamp,
-            title = "Arc table lamp",
-            meta = "Brushed brass • £89.00",
-        )
-        PhotoPreview(
-            background = ScanningColors.RecipeCard,
-            brand = "THE SUNDAY TABLE",
-            photo = R.drawable.img_screenshot_pasta,
-            title = "Lemon ricotta pasta",
-            meta = "20 min • serves 2",
-        )
-    }
-}
-
-@Composable
-private fun PreviewCardShell(
-    background: Color,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .size(width = 64.dp, height = 78.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(background)
-            .padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        content()
-    }
-}
-
-@Composable
-private fun TicketPreview() {
-    PreviewCardShell(ScanningColors.TicketBackground) {
-        Text(
-            text = "THE GARDEN • LIVE",
-            style = Mini5,
-            color = ScanningColors.TicketMuted,
-            softWrap = false,
-        )
-        Text(
-            text = "JAZZ AT\nTHE GARDEN",
-            style = Mini8,
-            color = Color.White,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = "FRI 16 OCT 2026 • 19:30",
-            style = Mini5,
-            color = ScanningColors.TicketMuted,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            BarcodeWidths.forEach { barWidth ->
-                Box(
+        if (screenshots.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .size(width = 200.dp, height = 78.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(ScanningColors.LampCard),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Searching device storage...", style = RowSubtitle, color = SnapTaskColors.TextSecondary)
+            }
+        } else {
+            screenshots.take(3).forEach { item ->
+                AsyncImage(
+                    model = item.contentUri,
+                    contentDescription = item.displayName,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .width(barWidth.dp)
-                        .fillMaxHeight()
-                        .background(ScanningColors.Barcode),
+                        .size(width = 64.dp, height = 78.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ScanningColors.LampCard)
                 )
             }
         }
@@ -254,46 +242,7 @@ private fun TicketPreview() {
 }
 
 @Composable
-private fun PhotoPreview(
-    background: Color,
-    brand: String,
-    @DrawableRes photo: Int,
-    title: String,
-    meta: String,
-) {
-    PreviewCardShell(background) {
-        Text(
-            text = brand,
-            style = Mini5,
-            color = SnapTaskColors.TextSecondary,
-            softWrap = false,
-        )
-        Image(
-            painter = painterResource(photo),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(28.dp)
-                .clip(RoundedCornerShape(4.dp)),
-        )
-        Text(
-            text = title,
-            style = Mini8,
-            color = SnapTaskColors.TextPrimary,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = meta,
-            style = Mini5,
-            color = SnapTaskColors.TextSecondary,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
-private fun ProgressCard(current: Int, total: Int, progress: Float) {
+private fun ProgressCard(current: Int, total: Int, progress: Float, statusText: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -330,14 +279,14 @@ private fun ProgressCard(current: Int, total: Int, progress: Float) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .fillMaxWidth(progress)
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
                     .clip(RoundedCornerShape(4.dp))
                     .background(SnapTaskColors.Burgundy),
             )
         }
 
         Text(
-            text = "Categorizing screenshots...",
+            text = if (statusText.isNotBlank()) statusText else "Processing & categorizing screenshots...",
             style = ProgressStatus,
             color = SnapTaskColors.TextSecondary,
             modifier = Modifier.fillMaxWidth(),
@@ -346,7 +295,12 @@ private fun ProgressCard(current: Int, total: Int, progress: Float) {
 }
 
 @Composable
-private fun ScanningDetailsCard() {
+private fun ScanningDetailsCard(
+    totalFound: Int,
+    uploaded: Int,
+    failed: Int,
+    remaining: Int,
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -357,13 +311,18 @@ private fun ScanningDetailsCard() {
     ) {
         DetailRow(
             icon = R.drawable.ic_check,
-            title = "Screenshots found",
-            subtitle = "128 items in the example library",
+            title = "Screenshots detected: $totalFound",
+            subtitle = "From your device gallery MediaStore",
+        )
+        DetailRow(
+            icon = R.drawable.ic_scan_line,
+            title = "Upload status: $uploaded uploaded · $failed failed",
+            subtitle = "$remaining screenshots remaining to sync",
         )
         DetailRow(
             icon = R.drawable.ic_sparkles_accent,
-            title = "Reading dates & categories",
-            subtitle = "You’ll review the results next.",
+            title = "AI on-device categorization",
+            subtitle = "Classifying into 10 dedicated categories",
         )
     }
 }
@@ -427,5 +386,16 @@ private fun MascotNook() {
 @Preview(showBackground = true, widthDp = 412, heightDp = 892)
 @Composable
 private fun ScreenshotScanningScreenPreview() {
-    ScreenshotScanningScreen(onBack = {}, onCancelScan = {})
+    ScreenshotScanningScreen(
+        onBack = {},
+        onCancelScan = {},
+        scanUiState = ScanUiState(
+            isScanning = true,
+            totalCount = 12,
+            scannedCount = 8,
+            progress = 0.66f,
+        ),
+        onStartScan = {},
+        onScanComplete = {},
+    )
 }

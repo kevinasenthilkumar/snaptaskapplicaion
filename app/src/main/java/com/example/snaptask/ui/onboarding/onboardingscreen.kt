@@ -112,7 +112,7 @@ fun OnboardingScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "Tickets, recipes, things you love. Find them without the endless scroll.",
+                text = "Tickets, travel, bills, recipes, notes and more. Categorized automatically without the endless scroll.",
                 style = Supporting,
                 color = SnapTaskColors.TextSecondary,
                 modifier = Modifier.fillMaxWidth(),
@@ -130,7 +130,7 @@ fun OnboardingScreen(
                 leadingIcon = painterResource(R.drawable.ic_arrow_right),
             )
             Text(
-                text = "Nothing is removed without your chosen rules.",
+                text = "Nothing is deleted without Android's approval.",
                 style = SnapTaskType.Caption,
                 color = SnapTaskColors.TextSecondary,
                 textAlign = TextAlign.Center,
@@ -309,18 +309,18 @@ private fun PreferenceCard() {
     ) {
         PreferenceRow(
             icon = R.drawable.ic_row_scan_line,
-            title = "Bring your screenshots together",
-            subtitle = "Choose what SnapTask can see.",
+            title = "Scans only screenshots",
+            subtitle = "Photos stay private, only screenshots are sorted.",
         )
         PreferenceRow(
             icon = R.drawable.ic_row_sparkles,
-            title = "Let AI do the sorting",
-            subtitle = "Review categories and detected dates.",
+            title = "AI sorts into 10 categories",
+            subtitle = "Tickets, Travel, Bills, Shopping, Food, Notes & more.",
         )
         PreferenceRow(
             icon = R.drawable.ic_row_list_checks,
-            title = "Take action, on your terms",
-            subtitle = "Review cleanup or opt into automation.",
+            title = "Browse & delete with ease",
+            subtitle = "See images inside each category and tap delete anytime.",
         )
     }
 }

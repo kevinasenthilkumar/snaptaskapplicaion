@@ -10,10 +10,10 @@ class DatedItemValidator
     public static function validateCreate(array $data): Validator
     {
         return Validator::make($data, [
-            'screenshot_id' => 'required|numeric',
+            'screenshot_id' => 'numeric',
             'title' => 'required|min:1|max:255',
-            'category' => 'required|in:ticket,bill,event,reservation,appointment,deadline,travel,booking,other',
-            'event_date' => 'required|date',
+            'category' => 'in:ticket,bill,event,reservation,appointment,deadline,travel,booking,other,Tickets & Events',
+            'event_date' => 'date',
             'event_time' => 'time',
             'end_date' => 'date',
             'amount' => 'numeric',

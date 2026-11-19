@@ -1,5 +1,6 @@
 package com.example.snaptask.ui.auth
 
+import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -204,7 +205,9 @@ fun CreateAccountScreen(
                         focusManager.clearFocus()
                         localError = when {
                             name.isBlank() -> "Please enter your name"
+                            name.trim().length < 2 -> "Name must be at least 2 characters"
                             email.isBlank() -> "Please enter your email"
+                            !Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches() -> "Please enter a valid email address (e.g. user@example.com)"
                             password.length < 8 -> "Password must be at least 8 characters"
                             password != confirmPassword -> "Passwords do not match"
                             else -> null

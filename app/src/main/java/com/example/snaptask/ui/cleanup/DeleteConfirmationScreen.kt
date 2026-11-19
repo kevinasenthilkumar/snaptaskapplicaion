@@ -54,8 +54,18 @@ private val DialogBody = inter(13.sp, lineHeight = 19.5.sp)
 fun DeleteConfirmationScreen(
     onConfirmDelete: () -> Unit,
     onCancel: () -> Unit,
+    count: Int = 1,
+    categoryName: String? = null,
+    sizeFormatted: String = "",
     modifier: Modifier = Modifier,
 ) {
+    val question = if (categoryName != null) {
+        "Delete all $count screenshots in $categoryName?"
+    } else {
+        "Delete $count screenshot${if (count > 1) "s" else ""}?"
+    }
+    val buttonLabel = "Delete $count screenshot${if (count > 1) "s" else ""}"
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -83,36 +93,38 @@ fun DeleteConfirmationScreen(
                 modifier = Modifier.size(32.dp),
             )
             Text(
-                text = "Delete 6 screenshots?",
+                text = question,
                 style = DialogQuestion,
                 color = SnapTaskColors.TextPrimary,
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "These screenshots have reached their cleanup date. Kept items won’t be touched.",
+                text = "These screenshots will be removed from your phone gallery. Android will ask for your confirmation.",
                 style = DialogBody,
                 color = SnapTaskColors.TextSecondary,
                 textAlign = TextAlign.Center,
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFFF8EDF0))
-                    .padding(12.dp),
-            ) {
-                Text(
-                    text = "18.4 MB selected · Restore from Recently deleted for 30 days, until 15 Nov 2026.",
-                    style = inter(12.sp, lineHeight = 18.sp),
-                    color = SnapTaskColors.Burgundy,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            if (sizeFormatted.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFF8EDF0))
+                        .padding(12.dp),
+                ) {
+                    Text(
+                        text = "$sizeFormatted selected · Trash with Android system confirmation",
+                        style = inter(12.sp, lineHeight = 18.sp),
+                        color = SnapTaskColors.Burgundy,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             SnapTaskPrimaryButton(
-                label = "Delete 6 screenshots",
+                label = buttonLabel,
                 onClick = onConfirmDelete,
                 leadingIcon = painterResource(R.drawable.ic_trash),
             )

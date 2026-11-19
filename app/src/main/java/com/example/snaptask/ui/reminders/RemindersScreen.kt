@@ -138,7 +138,7 @@ fun RemindersScreen(
             }
 
             SnapTaskBottomNavigation(
-                selectedTab = BottomTab.Reminders,
+                selectedTab = BottomTab.Home,
                 onTabSelected = onTabSelected,
             )
         }

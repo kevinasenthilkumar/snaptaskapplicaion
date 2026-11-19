@@ -14,6 +14,7 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
     val isOnboardingDone: Boolean = false,
+    val hasSeenIntro: Boolean = false,
     val error: String? = null,
     val userName: String? = null,
     val userEmail: String? = null,
@@ -30,7 +31,12 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         viewModelScope.launch {
             val loggedIn = authRepository.isLoggedIn()
             val onboardingDone = authRepository.isOnboardingDone()
-            _uiState.value = _uiState.value.copy(isLoggedIn = loggedIn, isOnboardingDone = onboardingDone)
+            val introSeen = authRepository.hasSeenIntro()
+            _uiState.value = _uiState.value.copy(
+                isLoggedIn = loggedIn,
+                isOnboardingDone = onboardingDone,
+                hasSeenIntro = introSeen
+            )
         }
     }
 
@@ -73,6 +79,13 @@ class AuthViewModel(private val authRepository: AuthRepository) : ViewModel() {
         viewModelScope.launch {
             authRepository.setOnboardingDone()
             _uiState.value = _uiState.value.copy(isOnboardingDone = true)
+        }
+    }
+
+    fun setIntroSeen() {
+        viewModelScope.launch {
+            authRepository.setIntroSeen()
+            _uiState.value = _uiState.value.copy(hasSeenIntro = true)
         }
     }
 

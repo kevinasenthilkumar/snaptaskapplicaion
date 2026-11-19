@@ -2,6 +2,7 @@ package com.example.snaptask.ui.cleanup
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,10 +22,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -34,12 +40,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.snaptask.R
+import com.example.snaptask.data.local.LocalScreenshotEntity
 import com.example.snaptask.ui.components.BottomTab
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskBottomNavigation
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
-import com.example.snaptask.ui.theme.InterFamily
+import com.example.snaptask.ui.components.formatFileSize
+import com.example.snaptask.ui.theme.AppFontFamily
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
 
@@ -48,7 +57,7 @@ private fun inter(
     weight: FontWeight = FontWeight.Normal,
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) = TextStyle(
-    fontFamily = InterFamily,
+    fontFamily = AppFontFamily,
     fontWeight = weight,
     fontSize = size,
     lineHeight = lineHeight,
@@ -64,11 +73,24 @@ private val ItemMeta = inter(11.sp, lineHeight = 16.5.sp)
 
 @Composable
 fun CleanupReviewScreen(
+    screenshots: List<LocalScreenshotEntity> = emptyList(),
     onBack: () -> Unit,
-    onDeleteConfirmed: () -> Unit,
+    onDeleteConfirmed: (List<Long>) -> Unit = {},
     onTabSelected: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var selectedIds by remember(screenshots) {
+        mutableStateOf(screenshots.map { it.id }.toSet())
+    }
+
+    val selectedScreenshots = remember(screenshots, selectedIds) {
+        screenshots.filter { it.id in selectedIds }
+    }
+
+    val totalBytes = remember(selectedScreenshots) {
+        selectedScreenshots.sumOf { it.size }
+    }
+
     DoodleBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -88,53 +110,83 @@ fun CleanupReviewScreen(
             ) {
                 Text(text = "Keep what matters.", style = Heading, color = SnapTaskColors.TextPrimary)
                 Text(
-                    text = "Review 6 eligible screenshots before deleting.",
+                    text = if (screenshots.isNotEmpty())
+                        "Review ${screenshots.size} screenshots before deleting."
+                    else
+                        "No screenshots eligible for cleanup yet.",
                     style = Subtitle,
                     color = SnapTaskColors.TextSecondary,
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(text = "6 selected · 18.4 MB", style = SectionTitle, color = SnapTaskColors.Burgundy)
-                    Text(text = "Deselect all", style = SectionMeta, color = SnapTaskColors.Burgundy)
-                }
+                if (screenshots.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${selectedIds.size} selected · ${formatFileSize(totalBytes)}",
+                            style = SectionTitle,
+                            color = SnapTaskColors.Burgundy,
+                        )
+                        Text(
+                            text = if (selectedIds.size == screenshots.size) "Deselect all" else "Select all",
+                            style = SectionMeta,
+                            color = SnapTaskColors.Burgundy,
+                            modifier = Modifier.clickable(role = Role.Button) {
+                                selectedIds = if (selectedIds.size == screenshots.size) emptySet()
+                                else screenshots.map { it.id }.toSet()
+                            }
+                        )
+                    }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SnapTaskColors.Surface)
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(text = "Dated · event was 15 Oct", style = inter(13.sp, FontWeight.SemiBold), color = SnapTaskColors.TextPrimary)
-                    CleanupItemRow(title = "Museum late opening", meta = "Ticket · 15 Oct · eligible today", checked = true)
-                    CleanupItemRow(title = "Flight to Edinburgh", meta = "Travel · 15 Oct · eligible today", checked = true)
-                    CleanupItemRow(title = "Ceramics workshop", meta = "Booking · 15 Oct · eligible today", checked = true)
-                }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SnapTaskColors.Surface)
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        screenshots.forEach { item ->
+                            val isChecked = item.id in selectedIds
+                            CleanupItemRow(
+                                title = item.displayName,
+                                meta = "${item.category} · ${formatFileSize(item.size)}",
+                                contentUri = item.contentUri,
+                                checked = isChecked,
+                                onToggle = {
+                                    selectedIds = if (isChecked) selectedIds - item.id
+                                    else selectedIds + item.id
+                                }
+                            )
+                        }
+                    }
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SnapTaskColors.Surface)
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(text = "Non-dated · saved 9 Oct", style = inter(13.sp, FontWeight.SemiBold), color = SnapTaskColors.TextPrimary)
-                    CleanupItemRow(title = "Market Street receipt", meta = "Saved 9 Oct · eligible today", checked = true)
-                    CleanupItemRow(title = "Canvas trainers", meta = "Saved 9 Oct · eligible today", checked = true)
-                    CleanupItemRow(title = "Weekend cabin ideas", meta = "Saved 9 Oct · eligible today", checked = true)
+                    if (selectedIds.isNotEmpty()) {
+                        SnapTaskPrimaryButton(
+                            label = "Delete ${selectedIds.size} screenshot${if (selectedIds.size > 1) "s" else ""}",
+                            onClick = { onDeleteConfirmed(selectedIds.toList()) },
+                            leadingIcon = painterResource(R.drawable.ic_trash),
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SnapTaskColors.Surface)
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Your library is clean. Nothing to delete.",
+                            style = Subtitle,
+                            color = SnapTaskColors.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-
-                SnapTaskPrimaryButton(
-                    label = "Delete 6 screenshots",
-                    onClick = onDeleteConfirmed,
-                    leadingIcon = painterResource(R.drawable.ic_trash),
-                )
             }
 
             SnapTaskBottomNavigation(
@@ -167,33 +219,43 @@ private fun CleanupAppBar(onBack: () -> Unit) {
             style = SnapTaskType.AppBarTitle,
             color = SnapTaskColors.Burgundy,
         )
-        Row(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Image(
-                painter = painterResource(R.drawable.ic_bell),
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-            )
-        }
     }
 }
 
 @Composable
-private fun CleanupItemRow(title: String, meta: String, checked: Boolean) {
+private fun CleanupItemRow(
+    title: String,
+    meta: String,
+    contentUri: String? = null,
+    checked: Boolean,
+    onToggle: () -> Unit,
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Checkbox, onClick = onToggle),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.drawable.img_screenshot_lamp),
-            contentDescription = null,
-            modifier = Modifier
-                .size(width = 38.dp, height = 48.dp)
-                .clip(RoundedCornerShape(6.dp)),
-        )
+        if (contentUri != null) {
+            AsyncImage(
+                model = contentUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(width = 38.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFEDE7DE)),
+            )
+        } else {
+            Image(
+                painter = painterResource(R.drawable.img_screenshot_lamp),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(width = 38.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            )
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -205,7 +267,8 @@ private fun CleanupItemRow(title: String, meta: String, checked: Boolean) {
             modifier = Modifier
                 .size(22.dp)
                 .clip(CircleShape)
-                .background(if (checked) SnapTaskColors.Burgundy else Color.Transparent),
+                .background(if (checked) SnapTaskColors.Burgundy else Color.Transparent)
+                .border(1.dp, if (checked) SnapTaskColors.Burgundy else Color(0xFFC7B8BC), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (checked) {

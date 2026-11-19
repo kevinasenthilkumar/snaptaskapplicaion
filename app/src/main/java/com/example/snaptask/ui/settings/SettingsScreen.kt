@@ -71,8 +71,10 @@ fun SettingsScreen(
     onOpenRules: () -> Unit,
     onOpenRecentlyDeleted: () -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenHowItWorks: () -> Unit = {},
     onTabSelected: (BottomTab) -> Unit,
     onOpenProfile: () -> Unit = {},
+    onLogout: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var remindersChecked by remember { mutableStateOf(true) }
@@ -155,6 +157,30 @@ fun SettingsScreen(
                         onClick = onOpenRecentlyDeleted,
                     )
                 }
+                Text(text = "Account", style = SectionTitle, color = SnapTaskColors.TextPrimary)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SnapTaskColors.Surface)
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    NavRow(
+                        icon = R.drawable.ic_lock,
+                        title = "My Profile",
+                        subtitle = "View and edit profile details",
+                        onClick = onOpenProfile,
+                    )
+                    NavRow(
+                        icon = R.drawable.ic_arrow_left,
+                        title = "Log out",
+                        subtitle = "Sign out and return to welcome screen",
+                        onClick = onLogout,
+                    )
+                }
+
 
                 Text(text = "Your data", style = SectionTitle, color = SnapTaskColors.TextPrimary)
 
@@ -170,6 +196,23 @@ fun SettingsScreen(
                         title = "Permissions & privacy",
                         subtitle = "Access, AI processing and data controls",
                         onClick = onOpenPermissions,
+                    )
+                }
+
+                Text(text = "About & Guide", style = SectionTitle, color = SnapTaskColors.TextPrimary)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SnapTaskColors.Surface)
+                        .padding(18.dp),
+                ) {
+                    NavRow(
+                        icon = R.drawable.ic_info,
+                        title = "How it works",
+                        subtitle = "Categorization & screenshot cleanup guide",
+                        onClick = onOpenHowItWorks,
                     )
                 }
 

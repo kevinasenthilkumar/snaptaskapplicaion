@@ -31,11 +31,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.snaptask.R
+import com.example.snaptask.data.network.NonDatedItemDto
 import com.example.snaptask.ui.components.BottomTab
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskBottomNavigation
@@ -67,13 +69,22 @@ private val RecordMeta = inter(11.sp, lineHeight = 16.5.sp)
 
 @Composable
 fun NonDatedScreenshotsScreen(
+    items: List<NonDatedItemDto> = emptyList(),
     onBack: () -> Unit,
     onOpenDatedTab: () -> Unit,
-    onSelectRecord: () -> Unit,
+    onSelectRecord: (Long) -> Unit,
     onTabSelected: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var query by remember { mutableStateOf("") }
+
+    val filteredItems = remember(items, query) {
+        if (query.isBlank()) items
+        else items.filter {
+            it.title.contains(query, ignoreCase = true) ||
+            (it.category?.contains(query, ignoreCase = true) == true)
+        }
+    }
 
     DoodleBackground(modifier = modifier) {
         Column(
@@ -98,7 +109,7 @@ fun NonDatedScreenshotsScreen(
                     color = SnapTaskColors.TextPrimary,
                 )
                 Text(
-                    text = "86 screenshots · ordered by saved date",
+                    text = "${filteredItems.size} screenshots · general items without event dates",
                     style = Subtitle,
                     color = SnapTaskColors.TextSecondary,
                 )
@@ -106,42 +117,54 @@ fun NonDatedScreenshotsScreen(
                 SnapTaskSearchField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = "Search screenshots, dates, places",
+                    placeholder = "Search items, notes, ideas",
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PillTab(label = "Dated · 42", selected = false, onClick = onOpenDatedTab)
-                    PillTab(label = "Non-dated · 86", selected = true, onClick = {})
+                    PillTab(label = "Dated", selected = false, onClick = onOpenDatedTab)
+                    PillTab(label = "Non-dated · ${filteredItems.size}", selected = true, onClick = {})
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PillChip(label = "All", selected = true)
-                    PillChip(label = "Shopping", selected = false)
-                    PillChip(label = "Recipes", selected = false)
-                    PillChip(label = "Receipts", selected = false)
-                }
+                if (filteredItems.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 36.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_row_image),
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                        )
+                        Text("No non-dated screenshots found", style = SnapTaskType.Body, color = SnapTaskColors.TextPrimary)
+                        Text(
+                            "Screenshots without specific event dates will appear here.",
+                            style = SnapTaskType.Caption,
+                            color = SnapTaskColors.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = "Saved recently", style = SectionTitle, color = SnapTaskColors.TextPrimary)
+                        Text(text = "Date ↓", style = SectionSort, color = SnapTaskColors.Burgundy)
+                    }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(text = "Saved for later", style = SectionTitle, color = SnapTaskColors.TextPrimary)
-                    Text(text = "Oldest first", style = SectionSort, color = SnapTaskColors.Burgundy)
+                    filteredItems.forEach { item ->
+                        LibraryRecordRow(
+                            category = item.category ?: "Non-dated",
+                            title = item.title,
+                            meta = "Saved ${item.createdAt ?: ""}",
+                            onClick = { onSelectRecord(item.id) },
+                        )
+                    }
                 }
-
-                LibraryRecordRow(
-                    category = "Receipts",
-                    title = "Market Street receipt",
-                    meta = "Saved 9 Oct · ready today",
-                    onClick = onSelectRecord,
-                )
-                LibraryRecordRow(
-                    category = "Shopping",
-                    title = "Arc table lamp",
-                    meta = "Saved 10 Oct · deletes 17 Oct",
-                    onClick = onSelectRecord,
-                )
             }
 
             SnapTaskBottomNavigation(
@@ -208,25 +231,6 @@ private fun PillTab(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PillChip(label: String, selected: Boolean) {
-    val shape = RoundedCornerShape(100.dp)
-    Box(
-        modifier = Modifier
-            .height(32.dp)
-            .clip(shape)
-            .background(if (selected) SnapTaskColors.Burgundy else SnapTaskColors.Surface)
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = FilterChipText,
-            color = if (selected) Color.White else SnapTaskColors.TextSecondary,
-        )
-    }
-}
-
-@Composable
 private fun LibraryRecordRow(
     category: String,
     title: String,
@@ -243,13 +247,19 @@ private fun LibraryRecordRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.drawable.img_screenshot_lamp),
-            contentDescription = null,
+        Box(
             modifier = Modifier
                 .size(width = 44.dp, height = 54.dp)
-                .clip(RoundedCornerShape(8.dp)),
-        )
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFFF8EDF0)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_row_image),
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),

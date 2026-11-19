@@ -1,93 +1,87 @@
-import re
+﻿import re
 from typing import Dict, Any, List
 
-DATED_KEYWORDS = {
-    'ticket': ['admit', 'ticket', 'section', 'row', 'seat', 'venue', 'barcode', 'qr code', 'admission', 'gate', 'show', 'concert', 'festival'],
-    'travel': ['flight', 'boarding pass', 'airline', 'terminal', 'depart', 'arrive', 'train', 'pnr', 'gate', 'seat', 'booking ref'],
-    'booking': ['reservation', 'booking', 'table', 'workshop', 'studio', 'appointment', 'confirmed', 'dr.', 'clinic'],
-    'bill': ['invoice', 'due date', 'payment due', 'bill', 'statement', 'balance due', 'pay by', 'amount due'],
-    'event': ['live', 'exhibition', 'conference', 'webinar', 'meetup', 'rsvp', 'doors open', 'starts at'],
-}
-
-NON_DATED_KEYWORDS = {
-    'recipe': ['ingredients', 'recipe', 'tsp', 'tbsp', 'cup', 'skillet', 'saucepan', 'simmer', 'bake', 'boil', 'cook', 'servings', 'prep time'],
-    'shopping': ['in stock', 'add to cart', 'add to bag', 'checkout', 'price', 'buy now', 'size', 'reviews', 'sku', 'product'],
-    'receipt': ['receipt', 'subtotal', 'tax', 'cash', 'change', 'card payment', 'total', 'terminal', 'store #'],
-    'design': ['interior', 'lamp', 'palette', 'minimalist', 'aesthetic', 'typography', 'architecture', 'decor', 'layout'],
-    'article': ['read time', 'published', 'author', 'blog', 'medium', 'substack', 'newsletter', 'headline'],
-    'idea': ['notes', 'wishlist', 'quote', 'draft', 'thought', 'bookmark', 'inspiration'],
+CATEGORIES = {
+    'Tickets': [
+        'ticket', 'tickets', 'admit one', 'admit', 'seat', 'row', 'bookmyshow', 'pnr', 'coach',
+        'cinema', 'multiplex', 'inox', 'pvr', 'movie', 'show time', 'screen', 'hall', 'venue',
+        'match', 'stadium', 'entry pass', 'boarding', 'gate', 'concert', 'festival'
+    ],
+    'Travel': [
+        'boarding pass', 'flight', 'check-in', 'booking id', 'irctc', 'makemytrip', 'goibibo',
+        'yatra', 'airline', 'indigo', 'air india', 'spicejet', 'terminal', 'depart', 'arrive',
+        'hotel booking', 'reservation', 'train', 'coach', 'berth', 'itinerary', 'trip'
+    ],
+    'Bills & Payments': [
+        'amount due', 'paid', 'upi', 'transaction id', 'gpay', 'phonepe', 'paytm', 'bhim',
+        'bank', 'debited', 'credited', 'bill', 'due date', 'statement', 'electricity bill',
+        'recharge', 'payment successful', 'ref no', 'utr', 'imps', 'neft'
+    ],
+    'Receipts & Orders': [
+        'invoice', 'order id', 'subtotal', 'gst', 'delivered', 'tax invoice', 'bill of supply',
+        'order confirmed', 'tracking', 'shipment', 'courier', 'delivery partner', 'amazon order',
+        'flipkart', 'receipt', 'payment receipt', 'cash on delivery'
+    ],
+    'Shopping': [
+        'add to cart', '% off', '₹', 'free delivery', 'amazon', 'myntra', 'flipkart', 'ajio',
+        'meesho', 'in stock', 'price', 'buy now', 'size', 'reviews', 'wishlist', 'discount',
+        'coupon', 'sale', 'out of stock', 'cart'
+    ],
+    'Food & Recipes': [
+        'ingredients', 'tbsp', 'tsp', 'serves', 'menu', 'zomato', 'swiggy', 'recipe', 'cuisine',
+        'restaurant', 'prep time', 'cook time', 'dishes', 'order food', 'tasty', 'simmer',
+        'bake', 'calorie', 'nutrition', 'servings'
+    ],
+    'Study & Notes': [
+        'chapter', 'assignment', 'definition', 'syllabus', 'unit', 'lecture', 'slide', 'course',
+        'module', 'exam', 'questions', 'formula', 'theorem', 'code', 'function', 'class',
+        'algorithm', 'notes', 'homework', 'tutorial'
+    ],
+    'Chats & Social': [
+        'typing…', 'typing...', 'seen', 'likes', 'followers', 'following', 'reply', 'whatsapp',
+        'instagram', 'chat', 'message', 'dms', 'retweet', 'story', 'post', 'status', 'shared',
+        'meme', 'comments'
+    ],
+    'Maps & Places': [
+        'directions', 'min', 'km', 'google maps', 'open now', 'navigate', 'location', 'map',
+        'traffic', 'fastest route', 'distance', 'address', 'landmark', 'hours', 'ratings'
+    ]
 }
 
 class ClassificationService:
     @staticmethod
     def classify(ocr_text: str, has_detected_date: bool = False) -> Dict[str, Any]:
-        """Classify screenshot into dated, non_dated, or unclassified with sub-categories."""
+        """Classify screenshot into pure categories without dated/non-dated dichotomy."""
         text_lower = ocr_text.lower()
-        matched_dated: List[str] = []
-        matched_non_dated: List[str] = []
+        matched_category_keywords: Dict[str, List[str]] = {}
+        category_scores: Dict[str, int] = {}
 
-        dated_sub_scores: Dict[str, int] = {}
-        for sub_cat, keywords in DATED_KEYWORDS.items():
-            score = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text_lower))
-            if score > 0:
-                dated_sub_scores[sub_cat] = score
-                matched_dated.extend([kw for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text_lower)])
+        for cat_name, keywords in CATEGORIES.items():
+            matched = [kw for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text_lower)]
+            if matched:
+                category_scores[cat_name] = len(matched)
+                matched_category_keywords[cat_name] = matched
 
-        non_dated_sub_scores: Dict[str, int] = {}
-        for sub_cat, keywords in NON_DATED_KEYWORDS.items():
-            score = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text_lower))
-            if score > 0:
-                non_dated_sub_scores[sub_cat] = score
-                matched_non_dated.extend([kw for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text_lower)])
-
-        total_dated_score = sum(dated_sub_scores.values()) + (3 if has_detected_date else 0)
-        total_non_dated_score = sum(non_dated_sub_scores.values())
-
-        reasons = []
-
-        if total_dated_score > total_non_dated_score and total_dated_score >= 2:
-            category = "dated"
-            best_sub = max(dated_sub_scores, key=dated_sub_scores.get) if dated_sub_scores else "event"
-            confidence = min(0.99, 0.65 + (total_dated_score * 0.08))
-            reasons.append(f"Detected time-sensitive indicators: {', '.join(matched_dated[:4])}")
-            if has_detected_date:
-                reasons.append("Identified calendar event date/time in image text.")
+        if not category_scores:
             return {
-                "category": category,
-                "sub_category": best_sub,
-                "confidence": round(confidence, 3),
-                "matched_keywords": matched_dated,
-                "reasons": reasons,
+                "category": "Other",
+                "sub_category": "Other",
+                "confidence": 0.50,
+                "matched_keywords": [],
+                "reasons": ["No specific category keywords found; classified as Other."],
             }
 
-        elif total_non_dated_score > 0:
-            category = "non_dated"
-            best_sub = max(non_dated_sub_scores, key=non_dated_sub_scores.get) if non_dated_sub_scores else "idea"
-            confidence = min(0.98, 0.60 + (total_non_dated_score * 0.08))
-            reasons.append(f"Detected reference indicators: {', '.join(matched_non_dated[:4])}")
-            return {
-                "category": category,
-                "sub_category": best_sub,
-                "confidence": round(confidence, 3),
-                "matched_keywords": matched_non_dated,
-                "reasons": reasons,
-            }
+        # Select highest scoring category
+        best_category = max(category_scores, key=category_scores.get)
+        top_score = category_scores[best_category]
+        matched_kws = matched_category_keywords[best_category]
 
-        # Ambiguous / Low text
-        if has_detected_date:
-            return {
-                "category": "dated",
-                "sub_category": "event",
-                "confidence": 0.75,
-                "matched_keywords": ["calendar_date"],
-                "reasons": ["Calendar date detected without strong reference keywords."],
-            }
+        confidence = min(0.99, 0.65 + (top_score * 0.08))
 
         return {
-            "category": "unclassified",
-            "sub_category": "other",
-            "confidence": 0.50,
-            "matched_keywords": [],
-            "reasons": ["Insufficient text or keywords to determine category with high confidence."],
+            "category": best_category,
+            "sub_category": best_category,
+            "confidence": round(confidence, 3),
+            "matched_keywords": matched_kws,
+            "reasons": [f"Matched keywords: {', '.join(matched_kws[:4])}"],
         }
-

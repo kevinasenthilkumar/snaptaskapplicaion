@@ -10,9 +10,9 @@ class NonDatedItemValidator
     public static function validateCreate(array $data): Validator
     {
         return Validator::make($data, [
-            'screenshot_id' => 'required|numeric',
+            'screenshot_id' => 'numeric',
             'title' => 'required|min:1|max:255',
-            'category' => 'required|in:recipe,design,shopping,article,reference,receipt,idea,other',
+            'category' => 'in:recipe,design,shopping,article,reference,receipt,idea,other,General',
         ]);
     }
 

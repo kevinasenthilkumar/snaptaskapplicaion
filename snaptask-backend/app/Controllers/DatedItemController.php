@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace App\Controllers;
 
@@ -34,9 +33,9 @@ class DatedItemController
         ], fn($v) => $v !== null);
 
         $result = $this->service->getList($request->getUserId(), $filters, $page, $limit);
-        $result['items'] = array_map(fn($item) => $item->toArray(), $result['items']);
+        $items = array_map(fn($item) => $item->toArray(), $result['items']);
 
-        Response::json($result, 'Dated items retrieved');
+        Response::json($items, 'Dated items retrieved');
     }
 
     public function show(Request $request): void
@@ -44,7 +43,7 @@ class DatedItemController
         $id = (int)$request->param('id');
         try {
             $item = $this->service->getById($id, $request->getUserId());
-            Response::json(['dated_item' => $item->toArray()]);
+            Response::json($item->toArray(), 'Dated item retrieved');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -60,7 +59,7 @@ class DatedItemController
 
         try {
             $item = $this->service->create($request->getUserId(), $validator->validated());
-            Response::created(['dated_item' => $item->toArray()], 'Dated item created successfully');
+            Response::created($item->toArray(), 'Dated item created successfully');
         } catch (\Throwable $e) {
             Response::serverError($e->getMessage());
         }
@@ -77,7 +76,7 @@ class DatedItemController
 
         try {
             $item = $this->service->update($id, $request->getUserId(), $validator->validated());
-            Response::json(['dated_item' => $item->toArray()], 'Dated item updated successfully');
+            Response::json($item->toArray(), 'Dated item updated successfully');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -97,22 +96,22 @@ class DatedItemController
     public function overdue(Request $request): void
     {
         $result = $this->service->getList($request->getUserId(), ['timeframe' => 'overdue']);
-        $result['items'] = array_map(fn($item) => $item->toArray(), $result['items']);
-        Response::json($result, 'Overdue dated items');
+        $items = array_map(fn($item) => $item->toArray(), $result['items']);
+        Response::json($items, 'Overdue dated items');
     }
 
     public function thisWeek(Request $request): void
     {
         $result = $this->service->getList($request->getUserId(), ['timeframe' => 'this_week']);
-        $result['items'] = array_map(fn($item) => $item->toArray(), $result['items']);
-        Response::json($result, 'This week dated items');
+        $items = array_map(fn($item) => $item->toArray(), $result['items']);
+        Response::json($items, 'This week dated items');
     }
 
     public function upcoming(Request $request): void
     {
         $result = $this->service->getList($request->getUserId(), ['timeframe' => 'upcoming']);
-        $result['items'] = array_map(fn($item) => $item->toArray(), $result['items']);
-        Response::json($result, 'Upcoming dated items');
+        $items = array_map(fn($item) => $item->toArray(), $result['items']);
+        Response::json($items, 'Upcoming dated items');
     }
 
     public function complete(Request $request): void
@@ -120,7 +119,7 @@ class DatedItemController
         $id = (int)$request->param('id');
         try {
             $item = $this->service->markCompleted($id, $request->getUserId());
-            Response::json(['dated_item' => $item->toArray()], 'Item marked as completed');
+            Response::json($item->toArray(), 'Item marked as completed');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -137,10 +136,9 @@ class DatedItemController
 
         try {
             $item = $this->service->snooze($id, $request->getUserId(), (string)$request->body('snooze_until'));
-            Response::json(['dated_item' => $item->toArray()], 'Item snoozed');
+            Response::json($item->toArray(), 'Item snoozed');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
     }
 }
-

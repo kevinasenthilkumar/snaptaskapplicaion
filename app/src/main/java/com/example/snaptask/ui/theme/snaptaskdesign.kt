@@ -16,10 +16,12 @@ object SnapTaskColors {
     val Surface = Color.White
 }
 
-val InterFamily = FontFamily(
+val AppFontFamily = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
 )
+
+val InterFamily = AppFontFamily
 
 object SnapTaskType {
     val AppBarTitle = TextStyle(

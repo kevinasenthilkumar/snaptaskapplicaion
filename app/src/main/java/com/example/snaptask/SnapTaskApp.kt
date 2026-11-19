@@ -1,15 +1,28 @@
 package com.example.snaptask
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
+import com.example.snaptask.ui.components.formatFileSize
 import com.example.snaptask.ui.auth.CreateAccountScreen
 import com.example.snaptask.ui.auth.LoginScreen
 import com.example.snaptask.ui.auth.MyProfileScreen
@@ -40,6 +53,10 @@ import com.example.snaptask.ui.settings.PermissionsPrivacyScreen
 import com.example.snaptask.ui.settings.SettingsScreen
 import com.example.snaptask.ui.welcome.WelcomeScreen
 import com.example.snaptask.viewmodel.AuthViewModel
+import com.example.snaptask.viewmodel.DatedItemsViewModel
+import com.example.snaptask.viewmodel.HomeViewModel
+import com.example.snaptask.viewmodel.NonDatedItemsViewModel
+import com.example.snaptask.viewmodel.ScreenshotViewModel
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Navigation destinations
@@ -85,18 +102,107 @@ private enum class Screen {
 fun SnapTaskApp() {
     val context = LocalContext.current
     val app = context.applicationContext as SnapTaskApplication
+    val scope = rememberCoroutineScope()
 
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.Factory(app.container.authRepository),
     )
     val authState by authViewModel.uiState.collectAsState()
 
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModel.Factory(
+            app.container.screenshotRepository,
+            app.container.datedItemRepository,
+            app.container.notificationRepository,
+        )
+    )
+
+    val datedViewModel: DatedItemsViewModel = viewModel(
+        factory = DatedItemsViewModel.Factory(app.container.datedItemRepository)
+    )
+    val datedState by datedViewModel.uiState.collectAsState()
+
+    val nonDatedViewModel: NonDatedItemsViewModel = viewModel(
+        factory = NonDatedItemsViewModel.Factory(app.container.nonDatedItemRepository)
+    )
+    val nonDatedState by nonDatedViewModel.uiState.collectAsState()
+    val homeState by homeViewModel.uiState.collectAsState()
+
+    val screenshotViewModel: ScreenshotViewModel = viewModel(
+        factory = ScreenshotViewModel.Factory(
+            app.container.screenshotRepository,
+            app.container.ocrProcessor,
+        )
+    )
+    val scanState by screenshotViewModel.uiState.collectAsState()
+    val allScreenshots by screenshotViewModel.allScreenshots.collectAsState()
+    val totalCount by screenshotViewModel.totalCount.collectAsState()
+
     var screen by rememberSaveable { mutableStateOf(Screen.Splash) }
+    var pendingDeleteIds by remember { mutableStateOf<List<Long>>(emptyList()) }
+    var pendingDeleteCategoryName by remember { mutableStateOf<String?>(null) }
+    var pendingDeleteSizeFormatted by remember { mutableStateOf("") }
+    var selectedCategory by rememberSaveable { mutableStateOf("All") }
+    var selectedScreenshotId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var isIntroFromSettings by rememberSaveable { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val trashLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            if (pendingDeleteIds.isNotEmpty()) {
+                coroutineScope.launch {
+                    app.container.mediaCleaner.onTrashConfirmed(pendingDeleteIds)
+                    pendingDeleteIds = emptyList()
+                    pendingDeleteCategoryName = null
+                }
+            }
+        }
+    }
+
+    fun requestDeleteScreenshot(id: Long) {
+        val target = allScreenshots.firstOrNull { it.id == id } ?: return
+        pendingDeleteCategoryName = null
+        pendingDeleteIds = listOf(id)
+        pendingDeleteSizeFormatted = formatFileSize(target.size)
+        screen = Screen.DeleteConfirmation
+    }
+
+    fun requestDeleteCategory(categoryName: String) {
+        val targets = allScreenshots.filter { it.category.equals(categoryName, ignoreCase = true) }
+        if (targets.isEmpty()) return
+        pendingDeleteCategoryName = categoryName
+        pendingDeleteIds = targets.map { it.id }
+        pendingDeleteSizeFormatted = formatFileSize(targets.sumOf { it.size })
+        screen = Screen.DeleteConfirmation
+    }
+
+    fun hasPhotoPermission(): Boolean {
+        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val granted = ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
+        val partial = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+        } else false
+        return granted || partial
+    }
+
+    fun onStartScanFlow() {
+        if (hasPhotoPermission()) {
+            screenshotViewModel.startScanning()
+            screen = Screen.ScreenshotScanning
+        } else {
+            screen = Screen.GalleryPermission
+        }
+    }
 
     // ── Session resolved from Splash ─────────────────────────────────────────
-    // When AuthViewModel has finished its session check, redirect appropriately.
     LaunchedEffect(authState.isLoggedIn) {
-        // Only act once we are still on the Splash screen.
         if (screen == Screen.Splash) {
             screen = if (authState.isLoggedIn) Screen.HomeDashboard else Screen.Splash
         }
@@ -105,13 +211,14 @@ fun SnapTaskApp() {
     fun handleBottomTab(tab: BottomTab) {
         screen = when (tab) {
             BottomTab.Home -> Screen.HomeDashboard
-            BottomTab.Library -> Screen.DatedScreenshots
-            BottomTab.Reminders -> Screen.Reminders
+            BottomTab.Library -> {
+                selectedCategory = "All"
+                Screen.DatedScreenshots
+            }
             BottomTab.Settings -> Screen.Settings
         }
     }
 
-    // Helper: log out and clear back-stack by going to Welcome
     fun logout() {
         authViewModel.logout()
         screen = Screen.Welcome
@@ -120,25 +227,27 @@ fun SnapTaskApp() {
     // ── Screen routing ────────────────────────────────────────────────────────
     when (screen) {
 
-        // ── Splash ────────────────────────────────────────────────────────────
         Screen.Splash -> SplashScreen(
             onAuthenticated = { screen = Screen.HomeDashboard },
             onUnauthenticated = {
-                // After splash delay: check real auth state
                 screen = if (authState.isLoggedIn) Screen.HomeDashboard else Screen.Welcome
             },
         )
 
-        // ── Welcome ───────────────────────────────────────────────────────────
         Screen.Welcome -> {
-            // No back handler — Welcome is the root for unauthenticated users.
             WelcomeScreen(
-                onGetStarted = { screen = Screen.CreateAccount },
+                onGetStarted = {
+                    if (!authState.hasSeenIntro) {
+                        isIntroFromSettings = false
+                        screen = Screen.Onboarding
+                    } else {
+                        screen = Screen.CreateAccount
+                    }
+                },
                 onLogin = { screen = Screen.Login },
             )
         }
 
-        // ── Login ─────────────────────────────────────────────────────────────
         Screen.Login -> {
             BackHandler { screen = Screen.Welcome }
             LoginScreen(
@@ -151,13 +260,11 @@ fun SnapTaskApp() {
                     authViewModel.login(email, password)
                 },
             )
-            // Navigate to Home once login succeeds
             LaunchedEffect(authState.isLoggedIn) {
                 if (authState.isLoggedIn) screen = Screen.HomeDashboard
             }
         }
 
-        // ── Create Account ────────────────────────────────────────────────────
         Screen.CreateAccount -> {
             BackHandler { screen = Screen.Welcome }
             CreateAccountScreen(
@@ -170,33 +277,36 @@ fun SnapTaskApp() {
                     authViewModel.register(name, email, password)
                 },
             )
-            // After successful registration move to ProfileSetup
             LaunchedEffect(authState.isLoggedIn) {
                 if (authState.isLoggedIn) screen = Screen.ProfileSetup
             }
         }
 
-        // ── Profile Setup (first-time registration only) ───────────────────────
         Screen.ProfileSetup -> {
-            BackHandler { /* intentionally blocked — can't go back to registration */ }
+            BackHandler { /* blocked */ }
             ProfileSetupScreen(
                 onBack = { /* blocked */ },
                 onProfileSaved = {
                     authViewModel.setOnboardingDone()
-                    screen = Screen.Onboarding
+                    screen = Screen.HomeDashboard
                 },
                 onSkip = {
                     authViewModel.setOnboardingDone()
-                    screen = Screen.Onboarding
+                    screen = Screen.HomeDashboard
                 },
             )
         }
 
-        // ── Existing Onboarding (new users, after ProfileSetup) ──────────────
         Screen.Onboarding -> {
-            BackHandler { /* blocked — cannot go back from onboarding to registration */ }
+            BackHandler {
+                if (isIntroFromSettings) screen = Screen.Settings
+                else screen = Screen.Welcome
+            }
             OnboardingScreen(
-                onBack = { /* blocked */ },
+                onBack = {
+                    if (isIntroFromSettings) screen = Screen.Settings
+                    else screen = Screen.Welcome
+                },
                 onHowItWorks = { screen = Screen.HowDated },
             )
         }
@@ -213,45 +323,75 @@ fun SnapTaskApp() {
             BackHandler { screen = Screen.HowDated }
             NonDatedScreen(
                 onBack = { screen = Screen.HowDated },
-                onChooseAccess = { screen = Screen.GalleryPermission },
+                onChooseAccess = {
+                    authViewModel.setIntroSeen()
+                    if (isIntroFromSettings) {
+                        screen = Screen.Settings
+                    } else {
+                        screen = Screen.CreateAccount
+                    }
+                },
             )
         }
 
         Screen.GalleryPermission -> {
-            BackHandler { screen = Screen.NonDated }
+            BackHandler { screen = Screen.HomeDashboard }
             GalleryPermissionScreen(
-                onBack = { screen = Screen.NonDated },
-                onAllow = { screen = Screen.ScreenshotScanning },
+                onBack = { screen = Screen.HomeDashboard },
+                onAllow = {
+                    screenshotViewModel.startScanning()
+                    screen = Screen.ScreenshotScanning
+                },
                 onDontAllow = { screen = Screen.AccessRecovery },
             )
         }
 
         Screen.AccessRecovery -> {
-            BackHandler { screen = Screen.GalleryPermission }
+            BackHandler { screen = Screen.HomeDashboard }
             AccessRecoveryScreen(
-                onBack = { screen = Screen.GalleryPermission },
-                onChooseScreenshots = { screen = Screen.ScreenshotScanning },
-                onOpenSettings = { screen = Screen.ScreenshotScanning },
+                onBack = { screen = Screen.HomeDashboard },
+                onChooseScreenshots = { onStartScanFlow() },
+                onOpenSettings = {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                    context.startActivity(intent)
+                },
             )
         }
 
         Screen.ScreenshotScanning -> {
-            BackHandler { screen = Screen.GalleryPermission }
+            BackHandler { screen = Screen.HomeDashboard }
             ScreenshotScanningScreen(
-                onBack = { screen = Screen.GalleryPermission },
+                onBack = { screen = Screen.HomeDashboard },
                 onCancelScan = { screen = Screen.HomeDashboard },
+                scanUiState = scanState,
+                onStartScan = { screenshotViewModel.startScanning() },
+                onScanComplete = {
+                    datedViewModel.loadItems()
+                    nonDatedViewModel.loadItems()
+                    homeViewModel.loadDashboard()
+                    screen = Screen.HomeDashboard
+                },
             )
         }
 
-        // ── Main App (authenticated) ──────────────────────────────────────────
         Screen.HomeDashboard -> {
-            // Prevent going back to auth screens after login
-            BackHandler { /* blocked — Home is the authenticated root */ }
+            BackHandler { /* Home is root, exits app cleanly */ }
             HomeDashboardScreen(
-                onTakeAction = { screen = Screen.CleanupReview },
-                onOpenDated = { screen = Screen.DatedScreenshots },
-                onOpenNonDated = { screen = Screen.NonDatedScreenshots },
-                onOpenReminders = { screen = Screen.Reminders },
+                totalCount = totalCount,
+                screenshots = allScreenshots,
+                onStartScan = ::onStartScanFlow,
+                onOpenCategory = { cat ->
+                    selectedCategory = cat
+                    screen = Screen.DatedScreenshots
+                },
+                onDeleteCategory = ::requestDeleteCategory,
+                onSelectScreenshot = { id ->
+                    selectedScreenshotId = id
+                    val item = allScreenshots.find { it.id == id }
+                    screen = if (item?.eventDate != null) Screen.DatedDetail else Screen.NonDatedDetail
+                },
                 onTabSelected = ::handleBottomTab,
             )
         }
@@ -259,9 +399,17 @@ fun SnapTaskApp() {
         Screen.DatedScreenshots -> {
             BackHandler { screen = Screen.HomeDashboard }
             DatedScreenshotsScreen(
+                items = allScreenshots,
+                initialCategory = selectedCategory,
                 onBack = { screen = Screen.HomeDashboard },
-                onOpenNonDatedTab = { screen = Screen.NonDatedScreenshots },
-                onSelectRecord = { screen = Screen.DatedDetail },
+                onOpenNonDatedTab = {},
+                onSelectRecord = { id ->
+                    selectedScreenshotId = id
+                    val item = allScreenshots.find { it.id == id }
+                    screen = if (item?.eventDate != null) Screen.DatedDetail else Screen.NonDatedDetail
+                },
+                onDeleteRecord = ::requestDeleteScreenshot,
+                onDeleteCategory = ::requestDeleteCategory,
                 onTabSelected = ::handleBottomTab,
             )
         }
@@ -269,29 +417,37 @@ fun SnapTaskApp() {
         Screen.NonDatedScreenshots -> {
             BackHandler { screen = Screen.DatedScreenshots }
             NonDatedScreenshotsScreen(
+                items = nonDatedState.items,
                 onBack = { screen = Screen.DatedScreenshots },
                 onOpenDatedTab = { screen = Screen.DatedScreenshots },
-                onSelectRecord = { screen = Screen.NonDatedDetail },
+                onSelectRecord = { id ->
+                    selectedScreenshotId = id
+                    screen = Screen.NonDatedDetail
+                },
                 onTabSelected = ::handleBottomTab,
             )
         }
 
         Screen.DatedDetail -> {
             BackHandler { screen = Screen.DatedScreenshots }
+            val selectedScreenshot = allScreenshots.find { it.id == selectedScreenshotId }
             DatedDetailScreen(
+                screenshot = selectedScreenshot,
                 onBack = { screen = Screen.DatedScreenshots },
                 onKeepThis = { screen = Screen.DatedScreenshots },
-                onTakeAction = { screen = Screen.CleanupReview },
+                onDelete = ::requestDeleteScreenshot,
                 onTabSelected = ::handleBottomTab,
             )
         }
 
         Screen.NonDatedDetail -> {
-            BackHandler { screen = Screen.NonDatedScreenshots }
+            BackHandler { screen = Screen.DatedScreenshots }
+            val selectedScreenshot = allScreenshots.find { it.id == selectedScreenshotId }
             NonDatedDetailScreen(
-                onBack = { screen = Screen.NonDatedScreenshots },
-                onKeepThis = { screen = Screen.NonDatedScreenshots },
-                onTakeAction = { screen = Screen.CleanupReview },
+                screenshot = selectedScreenshot,
+                onBack = { screen = Screen.DatedScreenshots },
+                onKeepThis = { screen = Screen.DatedScreenshots },
+                onDelete = ::requestDeleteScreenshot,
                 onTabSelected = ::handleBottomTab,
             )
         }
@@ -317,17 +473,47 @@ fun SnapTaskApp() {
         Screen.CleanupReview -> {
             BackHandler { screen = Screen.HomeDashboard }
             CleanupReviewScreen(
+                screenshots = allScreenshots,
                 onBack = { screen = Screen.HomeDashboard },
-                onDeleteConfirmed = { screen = Screen.DeleteConfirmation },
+                onDeleteConfirmed = { ids ->
+                    val targets = allScreenshots.filter { it.id in ids }
+                    pendingDeleteIds = ids
+                    pendingDeleteCategoryName = null
+                    pendingDeleteSizeFormatted = formatFileSize(targets.sumOf { it.size })
+                    screen = Screen.DeleteConfirmation
+                },
                 onTabSelected = ::handleBottomTab,
             )
         }
 
         Screen.DeleteConfirmation -> {
-            BackHandler { screen = Screen.CleanupReview }
+            BackHandler {
+                pendingDeleteIds = emptyList()
+                pendingDeleteCategoryName = null
+                screen = Screen.HomeDashboard
+            }
             DeleteConfirmationScreen(
-                onConfirmDelete = { screen = Screen.CleanupInProgress },
-                onCancel = { screen = Screen.CleanupReview },
+                count = pendingDeleteIds.size,
+                categoryName = pendingDeleteCategoryName,
+                sizeFormatted = pendingDeleteSizeFormatted,
+                onConfirmDelete = {
+                    val targets = allScreenshots.filter { it.id in pendingDeleteIds }
+                    val uris = targets.map { Uri.parse(it.contentUri) }
+                    val launched = app.container.mediaCleaner.requestTrash(uris, trashLauncher)
+                    if (!launched) {
+                        coroutineScope.launch {
+                            app.container.mediaCleaner.onTrashConfirmed(pendingDeleteIds)
+                            pendingDeleteIds = emptyList()
+                            pendingDeleteCategoryName = null
+                        }
+                    }
+                    screen = Screen.HomeDashboard
+                },
+                onCancel = {
+                    pendingDeleteIds = emptyList()
+                    pendingDeleteCategoryName = null
+                    screen = Screen.HomeDashboard
+                },
             )
         }
 
@@ -348,7 +534,9 @@ fun SnapTaskApp() {
 
         Screen.RecentlyDeleted -> {
             BackHandler { screen = Screen.Settings }
+            val trashedItems = allScreenshots.filter { it.status == "trashed" }
             RecentlyDeletedScreen(
+                trashedItems = trashedItems,
                 onBack = { screen = Screen.Settings },
                 onRestoreAll = { screen = Screen.HomeDashboard },
                 onDeleteForever = { screen = Screen.HomeDashboard },
@@ -364,9 +552,13 @@ fun SnapTaskApp() {
                 onOpenRules = { screen = Screen.CleanupRules },
                 onOpenRecentlyDeleted = { screen = Screen.RecentlyDeleted },
                 onOpenPermissions = { screen = Screen.PermissionsPrivacy },
+                onOpenHowItWorks = {
+                    isIntroFromSettings = true
+                    screen = Screen.Onboarding
+                },
                 onTabSelected = ::handleBottomTab,
-                // Pass profile entry point to Settings
                 onOpenProfile = { screen = Screen.MyProfile },
+                onLogout = ::logout,
             )
         }
 
@@ -397,7 +589,6 @@ fun SnapTaskApp() {
             )
         }
 
-        // ── My Profile (account management — not registration) ────────────────
         Screen.MyProfile -> {
             BackHandler { screen = Screen.Settings }
             MyProfileScreen(

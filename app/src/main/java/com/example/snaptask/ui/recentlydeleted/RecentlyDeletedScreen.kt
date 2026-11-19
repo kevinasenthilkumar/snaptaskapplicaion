@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -34,14 +35,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.snaptask.R
+import com.example.snaptask.data.local.LocalScreenshotEntity
 import com.example.snaptask.ui.components.BottomTab
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskBottomNavigation
 import com.example.snaptask.ui.components.SnapTaskInfoNote
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
 import com.example.snaptask.ui.components.SnapTaskSecondaryButton
-import com.example.snaptask.ui.theme.InterFamily
+import com.example.snaptask.ui.components.formatFileSize
+import com.example.snaptask.ui.theme.AppFontFamily
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
 
@@ -50,7 +54,7 @@ private fun inter(
     weight: FontWeight = FontWeight.Normal,
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) = TextStyle(
-    fontFamily = InterFamily,
+    fontFamily = AppFontFamily,
     fontWeight = weight,
     fontSize = size,
     lineHeight = lineHeight,
@@ -66,12 +70,15 @@ private val ItemMeta = inter(11.sp, lineHeight = 16.5.sp)
 
 @Composable
 fun RecentlyDeletedScreen(
+    trashedItems: List<LocalScreenshotEntity> = emptyList(),
     onBack: () -> Unit,
     onRestoreAll: () -> Unit,
     onDeleteForever: () -> Unit,
     onTabSelected: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val totalBytes = trashedItems.sumOf { it.size }
+
     DoodleBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -91,66 +98,76 @@ fun RecentlyDeletedScreen(
             ) {
                 Text(text = "A little safety net.", style = Heading, color = SnapTaskColors.TextPrimary)
                 Text(
-                    text = "6 screenshots · 18.4 MB in recovery",
+                    text = "${trashedItems.size} screenshots · ${formatFileSize(totalBytes)} in recovery",
                     style = Subtitle,
                     color = SnapTaskColors.TextSecondary,
                 )
 
-                SnapTaskInfoNote(text = "Deleted 16 Oct. Restore until 15 Nov 2026; permanently removed after 30 days.")
+                SnapTaskInfoNote(text = "Items moved to Android Gallery Trash can be restored within 30 days before permanent deletion.")
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(text = "Deleted today", style = SectionTitle, color = SnapTaskColors.TextPrimary)
-                    Text(text = "Select all", style = SectionMeta, color = SnapTaskColors.Burgundy)
+                if (trashedItems.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(text = "Deleted recently", style = SectionTitle, color = SnapTaskColors.TextPrimary)
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SnapTaskColors.Surface)
+                            .padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        trashedItems.forEach { item ->
+                            DeletedItemRow(
+                                title = item.displayName,
+                                meta = "${item.category} · ${formatFileSize(item.size)}",
+                                contentUri = item.contentUri,
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        SnapTaskPrimaryButton(
+                            label = "Restore all",
+                            onClick = onRestoreAll,
+                            leadingIcon = painterResource(R.drawable.ic_restore),
+                            modifier = Modifier.weight(1f),
+                        )
+                        SnapTaskSecondaryButton(
+                            label = "Delete forever",
+                            onClick = onDeleteForever,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SnapTaskColors.Surface)
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "No recently deleted screenshots in recovery.",
+                            style = Subtitle,
+                            color = SnapTaskColors.TextSecondary,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SnapTaskColors.Surface)
-                        .padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    DeletedItemRow(title = "Museum late opening", meta = "Ticket · 15 Oct · 30 days left")
-                    DeletedItemRow(title = "Flight to Edinburgh", meta = "Travel · 15 Oct · 30 days left")
-                    DeletedItemRow(title = "Ceramics workshop", meta = "Booking · 15 Oct · 30 days left")
-                    DeletedItemRow(title = "Market Street receipt", meta = "Saved 9 Oct · 30 days left")
-                    DeletedItemRow(title = "Canvas trainers", meta = "Saved 9 Oct · 30 days left")
-                    DeletedItemRow(title = "Weekend cabin ideas", meta = "Saved 9 Oct · 30 days left")
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    SnapTaskPrimaryButton(
-                        label = "Restore all",
-                        onClick = onRestoreAll,
-                        leadingIcon = painterResource(R.drawable.ic_restore),
-                        modifier = Modifier.weight(1f),
-                    )
-                    SnapTaskSecondaryButton(
-                        label = "Delete forever",
-                        onClick = onDeleteForever,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                Text(
-                    text = "Permanent deletion cannot be undone. Restored screenshots are marked Keep to avoid immediate cleanup.",
-                    style = SnapTaskType.Caption,
-                    color = SnapTaskColors.TextSecondary,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
 
             SnapTaskBottomNavigation(
-                selectedTab = BottomTab.Library,
+                selectedTab = BottomTab.Settings,
                 onTabSelected = onTabSelected,
             )
         }
@@ -182,19 +199,31 @@ private fun HeaderBar(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun DeletedItemRow(title: String, meta: String) {
+private fun DeletedItemRow(title: String, meta: String, contentUri: String? = null) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(
-            painter = painterResource(R.drawable.img_screenshot_lamp),
-            contentDescription = null,
-            modifier = Modifier
-                .size(width = 38.dp, height = 48.dp)
-                .clip(RoundedCornerShape(6.dp)),
-        )
+        if (contentUri != null) {
+            AsyncImage(
+                model = contentUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(width = 38.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFFEDE7DE)),
+            )
+        } else {
+            Image(
+                painter = painterResource(R.drawable.img_screenshot_lamp),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(width = 38.dp, height = 48.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            )
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -202,12 +231,6 @@ private fun DeletedItemRow(title: String, meta: String) {
             Text(text = title, style = ItemTitle, color = SnapTaskColors.TextPrimary)
             Text(text = meta, style = ItemMeta, color = SnapTaskColors.TextSecondary)
         }
-        Box(
-            modifier = Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(Color.Transparent),
-        )
     }
 }
 

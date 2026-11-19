@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 namespace App\Controllers;
 
@@ -32,9 +31,9 @@ class NonDatedItemController
         ], fn($v) => $v !== null);
 
         $result = $this->service->getList($request->getUserId(), $filters, $page, $limit);
-        $result['items'] = array_map(fn($item) => $item->toArray(), $result['items']);
+        $items = array_map(fn($item) => $item->toArray(), $result['items']);
 
-        Response::json($result, 'Non-dated items retrieved');
+        Response::json($items, 'Non-dated items retrieved');
     }
 
     public function show(Request $request): void
@@ -42,7 +41,7 @@ class NonDatedItemController
         $id = (int)$request->param('id');
         try {
             $item = $this->service->getById($id, $request->getUserId());
-            Response::json(['non_dated_item' => $item->toArray()]);
+            Response::json($item->toArray(), 'Non-dated item retrieved');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -58,7 +57,7 @@ class NonDatedItemController
 
         try {
             $item = $this->service->create($request->getUserId(), $validator->validated());
-            Response::created(['non_dated_item' => $item->toArray()], 'Non-dated item created successfully');
+            Response::created($item->toArray(), 'Non-dated item created successfully');
         } catch (\Throwable $e) {
             Response::serverError($e->getMessage());
         }
@@ -75,7 +74,7 @@ class NonDatedItemController
 
         try {
             $item = $this->service->update($id, $request->getUserId(), $validator->validated());
-            Response::json(['non_dated_item' => $item->toArray()], 'Non-dated item updated successfully');
+            Response::json($item->toArray(), 'Non-dated item updated successfully');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -96,15 +95,13 @@ class NonDatedItemController
     {
         $query = (string)$request->query('query', '');
         if (trim($query) === '') {
-            Response::json(['items' => []], 'Empty query');
+            Response::json([], 'Empty query');
             return;
         }
 
         $results = $this->service->search($request->getUserId(), $query);
-        Response::json([
-            'total' => count($results),
-            'items' => array_map(fn($item) => $item->toArray(), $results),
-        ], 'Search results');
+        $items = array_map(fn($item) => $item->toArray(), $results);
+        Response::json($items, 'Search results');
     }
 
     public function addFavorite(Request $request): void
@@ -112,7 +109,7 @@ class NonDatedItemController
         $id = (int)$request->param('id');
         try {
             $item = $this->service->toggleFavorite($id, $request->getUserId(), true);
-            Response::json(['non_dated_item' => $item->toArray()], 'Marked as favorite');
+            Response::json($item->toArray(), 'Marked as favorite');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -123,7 +120,7 @@ class NonDatedItemController
         $id = (int)$request->param('id');
         try {
             $item = $this->service->toggleFavorite($id, $request->getUserId(), false);
-            Response::json(['non_dated_item' => $item->toArray()], 'Removed from favorites');
+            Response::json($item->toArray(), 'Removed from favorites');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -141,7 +138,7 @@ class NonDatedItemController
         $data = $validator->validated();
         try {
             $tag = $this->service->addTag($id, $request->getUserId(), $data['name'], $data['color'] ?? '#721D38');
-            Response::created(['tag' => $tag], 'Tag added to item');
+            Response::created($tag, 'Tag added to item');
         } catch (\InvalidArgumentException $e) {
             Response::notFound($e->getMessage());
         }
@@ -159,4 +156,3 @@ class NonDatedItemController
         }
     }
 }
-

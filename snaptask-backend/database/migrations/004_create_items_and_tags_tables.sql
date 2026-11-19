@@ -1,4 +1,4 @@
--- Migration: 004_create_items_and_tags_tables.sql
+﻿-- Migration: 004_create_items_and_tags_tables.sql
 
 CREATE TABLE IF NOT EXISTS `dated_items` (
     `id` BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

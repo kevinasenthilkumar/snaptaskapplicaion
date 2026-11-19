@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
@@ -61,6 +61,13 @@ dependencies {
     implementation(libs.gson)
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+    // Coil Image Loading
+    implementation(libs.coil.compose)
+    // Room Local Database
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    // ML Kit Text Recognition
+    implementation(libs.play.services.mlkit.text.recognition)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

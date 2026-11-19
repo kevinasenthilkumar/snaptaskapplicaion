@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,10 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -33,21 +36,28 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.snaptask.R
+import com.example.snaptask.data.local.LocalScreenshotEntity
 import com.example.snaptask.ui.components.BottomTab
 import com.example.snaptask.ui.components.DoodleBackground
 import com.example.snaptask.ui.components.SnapTaskBottomNavigation
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
-import com.example.snaptask.ui.theme.InterFamily
+import com.example.snaptask.ui.components.formatFileSize
+import com.example.snaptask.ui.components.getCategoryIcon
+import com.example.snaptask.ui.theme.AppFontFamily
 import com.example.snaptask.ui.theme.SnapTaskColors
 import com.example.snaptask.ui.theme.SnapTaskType
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private fun inter(
     size: TextUnit,
     weight: FontWeight = FontWeight.Normal,
     lineHeight: TextUnit = TextUnit.Unspecified,
 ) = TextStyle(
-    fontFamily = InterFamily,
+    fontFamily = AppFontFamily,
     fontWeight = weight,
     fontSize = size,
     lineHeight = lineHeight,
@@ -61,12 +71,23 @@ private val CardMeta = inter(12.sp, lineHeight = 18.sp)
 
 @Composable
 fun NonDatedDetailScreen(
+    screenshot: LocalScreenshotEntity? = null,
     onBack: () -> Unit,
-    onKeepThis: () -> Unit,
-    onTakeAction: () -> Unit,
+    onKeepThis: () -> Unit = {},
+    onTakeAction: () -> Unit = {},
+    onDelete: (Long) -> Unit = {},
     onTabSelected: (BottomTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val capturedDateStr = remember(screenshot?.capturedAt) {
+        val captured = screenshot?.capturedAt
+        if (captured != null && captured > 0) {
+            SimpleDateFormat("d MMM yyyy, HH:mm", Locale.getDefault()).format(Date(captured * 1000L))
+        } else {
+            "Recent"
+        }
+    }
+
     DoodleBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -88,31 +109,52 @@ fun NonDatedDetailScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .height(220.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFFEDE7DE))
-                        .padding(16.dp),
+                        .background(Color(0xFFEDE7DE)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(text = "FORM & FIELD", style = inter(11.sp), color = SnapTaskColors.TextSecondary)
-                        Image(
-                            painter = painterResource(R.drawable.img_screenshot_lamp),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(110.dp)
-                                .clip(RoundedCornerShape(12.dp)),
+                    if (screenshot?.contentUri != null) {
+                        AsyncImage(
+                            model = screenshot.contentUri,
+                            contentDescription = screenshot.displayName,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
                         )
-                        Text(text = "Arc table lamp", style = inter(14.sp, FontWeight.SemiBold), color = SnapTaskColors.TextPrimary)
+                    } else {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(text = "PREVIEW", style = inter(11.sp), color = SnapTaskColors.TextSecondary)
+                            Image(
+                                painter = painterResource(R.drawable.img_screenshot_lamp),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(110.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                            )
+                        }
                     }
                 }
 
-                Text(text = "Arc table lamp", style = Heading, color = SnapTaskColors.TextPrimary)
+                Text(
+                    text = screenshot?.displayName ?: "Screenshot details",
+                    style = Heading,
+                    color = SnapTaskColors.TextPrimary
+                )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DetailChip(label = "Non-dated", filled = true)
-                    DetailChip(label = "Shopping", filled = false)
-                    DetailChip(label = "Edit category ✏️", filled = false)
+                    DetailChip(label = "Categorized", filled = true)
+                    DetailChip(label = screenshot?.category ?: "Shopping", filled = false)
+                    if (screenshot != null && screenshot.confidence > 0f) {
+                        DetailChip(
+                            label = "${(screenshot.confidence * 100).toInt()}% match",
+                            filled = false
+                        )
+                    }
                 }
 
                 Column(
@@ -124,21 +166,17 @@ fun NonDatedDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     DetailRow(
-                        iconRes = R.drawable.ic_nav_library,
-                        title = "Saved · 10 Oct 2026",
-                        subtitle = "No event date found · Add a date",
-                        actionIcon = R.drawable.ic_edit,
-                    )
-                    DetailRow(
-                        iconRes = R.drawable.ic_bell,
-                        title = "Notify · 16 Oct 2026",
-                        subtitle = "Day six, one day before deletion.",
+                        iconRes = getCategoryIcon(screenshot?.category ?: "Shopping"),
+                        title = "Category · ${screenshot?.category ?: "Shopping"}",
+                        subtitle = if (!screenshot?.ocrText.isNullOrBlank())
+                            screenshot!!.ocrText!!.take(80).replace("\n", " ")
+                        else "No date found in screenshot",
                         actionIcon = R.drawable.ic_chevron_right,
                     )
                     DetailRow(
-                        iconRes = R.drawable.ic_trash,
-                        title = "Delete · 17 Oct 2026",
-                        subtitle = "Seven days after being saved.",
+                        iconRes = R.drawable.ic_nav_library,
+                        title = "Captured · $capturedDateStr",
+                        subtitle = "Size: ${formatFileSize(screenshot?.size ?: 0L)}",
                         actionIcon = R.drawable.ic_chevron_right,
                     )
                 }
@@ -175,14 +213,21 @@ fun NonDatedDetailScreen(
                     }
 
                     SnapTaskPrimaryButton(
-                        label = "Take Action",
-                        onClick = onTakeAction,
+                        label = "Delete",
+                        leadingIcon = painterResource(R.drawable.ic_trash),
+                        onClick = {
+                            if (screenshot != null) {
+                                onDelete(screenshot.id)
+                            } else {
+                                onTakeAction()
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
 
                 Text(
-                    text = "2.8 MB · Automatic cleanup off · Not deleted",
+                    text = "Saved · Tap Delete to request approval from gallery",
                     style = SnapTaskType.Caption,
                     color = SnapTaskColors.TextSecondary,
                     textAlign = TextAlign.Center,

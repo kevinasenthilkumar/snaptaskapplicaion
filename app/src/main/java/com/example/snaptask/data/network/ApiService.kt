@@ -53,7 +53,7 @@ interface ApiService {
     @POST("screenshots/upload")
     suspend fun uploadScreenshot(
         @Part file: MultipartBody.Part,
-    ): Response<ApiResponse<ScreenshotDto>>
+    ): Response<ApiResponse<UploadScreenshotResponse>>
 
     // ── Dated Items ───────────────────────────────────────────────────
     @GET("dated-items")

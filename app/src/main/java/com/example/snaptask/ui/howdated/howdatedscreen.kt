@@ -104,13 +104,13 @@ fun HowDatedScreen(
                 color = SnapTaskColors.Burgundy,
             )
             Text(
-                text = "A date gives it\na little structure.",
+                text = "Screenshots sorted\nby category.",
                 style = Heading,
                 color = SnapTaskColors.TextPrimary,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "For tickets, bookings and anything with a date. Keep it for the day you need it.",
+                text = "Tickets, Travel, Bills, Orders, Food, Notes and more. Tap any category card on Home to see all screenshots inside.",
                 style = Supporting14,
                 color = SnapTaskColors.TextSecondary,
                 modifier = Modifier.fillMaxWidth(),
@@ -121,7 +121,7 @@ fun HowDatedScreen(
             InformationNote()
 
             Text(
-                text = "Dates can be corrected, and important screenshots can always be kept.",
+                text = "Easily search, filter and inspect your screenshots inside any category.",
                 style = Supporting13,
                 color = SnapTaskColors.TextSecondary,
                 modifier = Modifier.fillMaxWidth(),
@@ -130,12 +130,12 @@ fun HowDatedScreen(
             Spacer(Modifier.weight(1f))
 
             SnapTaskPrimaryButton(
-                label = "Next: non-dated screenshots",
+                label = "Next: delete & clean up",
                 onClick = onNext,
                 leadingIcon = painterResource(R.drawable.ic_arrow_right),
             )
             Text(
-                text = "Automatic cleanup is optional, never assumed.",
+                text = "Browse images in each category with full confidence.",
                 style = SnapTaskType.Caption,
                 color = SnapTaskColors.TextSecondary,
                 textAlign = TextAlign.Center,
@@ -282,14 +282,14 @@ private fun RetentionTimeline() {
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         TimelineEvent(
-            date = "16 OCT",
-            title = "Your event date",
-            body = "Enjoy Jazz at the Garden. We notify you today.",
+            date = "CARDS",
+            title = "One card per category",
+            body = "Home shows each active category with its count and total size.",
         )
         TimelineEvent(
-            date = "17 OCT",
-            title = "Eligible for deletion",
-            body = "One day after the specified date.",
+            date = "IMAGES",
+            title = "View all screenshots inside",
+            body = "Tap any card to view full-resolution previews, details and text.",
         )
     }
 }
@@ -353,7 +353,7 @@ private fun InformationNote() {
             modifier = Modifier.size(18.dp),
         )
         Text(
-            text = "Dated rule: notify on the specified date, then delete one day later.",
+            text = "Categorization runs on your phone with on-device AI. Your photos stay private.",
             style = NoteText,
             color = SnapTaskColors.Burgundy,
             modifier = Modifier.weight(1f),

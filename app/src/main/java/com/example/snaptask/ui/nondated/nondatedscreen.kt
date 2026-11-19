@@ -29,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -98,13 +99,13 @@ fun NonDatedScreen(
                 color = SnapTaskColors.Burgundy,
             )
             Text(
-                text = "No date?\nGive it seven days.",
+                text = "Select delete\nin any category.",
                 style = Heading,
                 color = SnapTaskColors.TextPrimary,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "Ideas, products and recipes get a week from the day you save them.",
+                text = "Delete individual screenshots or clear an entire category with one tap. Android always asks for your confirmation first.",
                 style = Supporting14,
                 color = SnapTaskColors.TextSecondary,
                 modifier = Modifier.fillMaxWidth(),
@@ -117,9 +118,16 @@ fun NonDatedScreen(
             Spacer(Modifier.weight(1f))
 
             SnapTaskPrimaryButton(
-                label = "Choose screenshot access",
+                label = "Get started",
                 onClick = onChooseAccess,
                 leadingIcon = painterResource(R.drawable.ic_arrow_right),
+            )
+            Text(
+                text = "Full control: nothing leaves your phone without your approval.",
+                style = SnapTaskType.Caption,
+                color = SnapTaskColors.TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
 
@@ -256,19 +264,14 @@ private fun RetentionTimeline() {
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         TimelineEvent(
-            date = "10 OCT",
-            title = "Screenshot saved",
-            body = "Your seven-day window begins.",
+            date = "DELETE",
+            title = "Delete entire category",
+            body = "Each category card features a Delete button to remove all its screenshots at once.",
         )
         TimelineEvent(
-            date = "16 OCT",
-            title = "A gentle heads-up",
-            body = "Day six: notified one day before deletion.",
-        )
-        TimelineEvent(
-            date = "17 OCT",
-            title = "Eligible for deletion",
-            body = "Day seven after being saved.",
+            date = "CONFIRM",
+            title = "Android system confirmation",
+            body = "Android requests your explicit approval so accidental deletions never happen.",
         )
     }
 }
@@ -332,7 +335,7 @@ private fun InformationNote() {
             modifier = Modifier.size(18.dp),
         )
         Text(
-            text = "Non-dated rule: notify on day six, delete on day seven. Kept items are excluded.",
+            text = "Full control: no screenshots are ever deleted automatically without your explicit action.",
             style = NoteText,
             color = SnapTaskColors.Burgundy,
             modifier = Modifier.weight(1f),

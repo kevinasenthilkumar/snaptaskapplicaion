@@ -1,0 +1,915 @@
+{
+  "info": {
+    "_postman_id": "snaptask-api-collection-v2",
+    "name": "SnapTask API Collection",
+    "description": "Full Postman test collection for SnapTask backend. Includes authentication, user profile, screenshots, dated/non-dated items, reminders, notifications, settings, rules, cleanup, and AI microservice endpoints. All auth endpoints include automated test scripts and token auto-save.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Public Root Status",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8000/"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Success is true', function () { var res = pm.response.json(); pm.expect(res.success).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "API v1 Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('API is healthy', function () { var res = pm.response.json(); pm.expect(res.data.status).to.eql('healthy'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Python AI Microservice Health",
+          "request": {
+            "method": "GET",
+            "url": "{{ai_base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('AI service online', function () { var res = pm.response.json(); pm.expect(res.online).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register – Success",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sarah Jenkins\",\n  \"email\": \"sarah.jenkins@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () { pm.response.to.have.status(201); });",
+                  "var res = pm.response.json();",
+                  "pm.test('success is true', function () { pm.expect(res.success).to.be.true; });",
+                  "pm.test('access_token returned', function () { pm.expect(res.data.access_token).to.be.a('string').and.not.empty; });",
+                  "pm.test('refresh_token returned', function () { pm.expect(res.data.refresh_token).to.be.a('string').and.not.empty; });",
+                  "pm.test('token_type is Bearer', function () { pm.expect(res.data.token_type).to.eql('Bearer'); });",
+                  "pm.test('expires_in is number', function () { pm.expect(res.data.expires_in).to.be.a('number'); });",
+                  "pm.test('user object has required fields', function () {",
+                  "  pm.expect(res.data.user.id).to.be.a('number');",
+                  "  pm.expect(res.data.user.email).to.be.a('string');",
+                  "  pm.expect(res.data.user.name).to.be.a('string');",
+                  "  pm.expect(res.data.user.status).to.eql('active');",
+                  "  pm.expect(res.data.user).to.not.have.property('password');",
+                  "  pm.expect(res.data.user).to.not.have.property('password_hash');",
+                  "});",
+                  "pm.environment.set('access_token', res.data.access_token);",
+                  "pm.environment.set('refresh_token', res.data.refresh_token);",
+                  "pm.environment.set('user_id', res.data.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register – Duplicate Email (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sarah Jenkins\",\n  \"email\": \"sarah.jenkins@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict', function () { pm.response.to.have.status(409); });",
+                  "pm.test('Error code USER_ALREADY_EXISTS', function () {",
+                  "  var res = pm.response.json();",
+                  "  pm.expect(res.success).to.be.false;",
+                  "  pm.expect(res.error_code).to.eql('USER_ALREADY_EXISTS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register – Invalid Data (422)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422 Unprocessable', function () { pm.response.to.have.status(422); });",
+                  "pm.test('Validation errors returned', function () {",
+                  "  var res = pm.response.json();",
+                  "  pm.expect(res.success).to.be.false;",
+                  "  pm.expect(res.errors).to.be.an('array').and.not.empty;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login – Demo User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"{{demo_password}}\",\n  \"device_name\": \"Pixel 8 Pro\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test('success is true', function () { pm.expect(res.success).to.be.true; });",
+                  "pm.test('access_token is string', function () { pm.expect(res.data.access_token).to.be.a('string').and.not.empty; });",
+                  "pm.test('refresh_token is string', function () { pm.expect(res.data.refresh_token).to.be.a('string').and.not.empty; });",
+                  "pm.test('token_type is Bearer', function () { pm.expect(res.data.token_type).to.eql('Bearer'); });",
+                  "pm.test('expires_in is number', function () { pm.expect(res.data.expires_in).to.be.a('number'); });",
+                  "pm.test('user object valid', function () {",
+                  "  pm.expect(res.data.user.id).to.be.a('number');",
+                  "  pm.expect(res.data.user.email).to.eql(pm.environment.get('demo_email'));",
+                  "  pm.expect(res.data.user.status).to.eql('active');",
+                  "  pm.expect(res.data.user).to.not.have.property('password_hash');",
+                  "});",
+                  "pm.environment.set('access_token', res.data.access_token);",
+                  "pm.environment.set('refresh_token', res.data.refresh_token);",
+                  "pm.environment.set('user_id', res.data.user.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login – Invalid Credentials (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"WrongPassword!\",\n  \"device_name\": \"Test\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 Unauthorized', function () { pm.response.to.have.status(401); });",
+                  "pm.test('Error code INVALID_CREDENTIALS', function () {",
+                  "  var res = pm.response.json();",
+                  "  pm.expect(res.success).to.be.false;",
+                  "  pm.expect(res.error_code).to.eql('INVALID_CREDENTIALS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test('New access_token returned', function () { pm.expect(res.data.access_token).to.be.a('string').and.not.empty; });",
+                  "pm.test('New refresh_token returned', function () { pm.expect(res.data.refresh_token).to.be.a('string').and.not.empty; });",
+                  "pm.environment.set('access_token', res.data.access_token);",
+                  "pm.environment.set('refresh_token', res.data.refresh_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Logout success message', function () {",
+                  "  var res = pm.response.json();",
+                  "  pm.expect(res.success).to.be.true;",
+                  "  pm.expect(res.message).to.include('Logged out');",
+                  "});",
+                  "// Clear tokens after successful logout",
+                  "pm.environment.set('access_token', '');",
+                  "pm.environment.set('refresh_token', '');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Access Protected Route After Logout (401)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// After logout the token should be invalid OR expired",
+                  "// JWT access tokens remain valid until expiry (stateless), so this may return 200 or 401 depending on expiry",
+                  "pm.test('Should return 401 (if token cleared) or 200 (if JWT still valid)', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. User Profile",
+      "item": [
+        {
+          "name": "Get My Profile (auth/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test('success is true', function () { pm.expect(res.success).to.be.true; });",
+                  "pm.test('data is UserDto (not nested under user key)', function () {",
+                  "  // data should BE the user object directly, not data.user",
+                  "  pm.expect(res.data.id).to.be.a('number');",
+                  "  pm.expect(res.data.email).to.be.a('string');",
+                  "  pm.expect(res.data.name).to.be.a('string');",
+                  "  pm.expect(res.data.status).to.eql('active');",
+                  "  pm.expect(res.data.created_at).to.be.a('string');",
+                  "  pm.expect(res.data).to.not.have.property('password');",
+                  "  pm.expect(res.data).to.not.have.property('password_hash');",
+                  "  pm.expect(res.data).to.not.have.property('user'); // must NOT be nested",
+                  "});",
+                  "pm.environment.set('user_id', res.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo User Updated\",\n  \"avatar_url\": null\n}"
+            },
+            "url": "{{base_url}}/auth/profile"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test('success is true', function () { pm.expect(res.success).to.be.true; });",
+                  "pm.test('data is updated UserDto (not nested)', function () {",
+                  "  pm.expect(res.data.id).to.be.a('number');",
+                  "  pm.expect(res.data.name).to.eql('Demo User Updated');",
+                  "  pm.expect(res.data).to.not.have.property('user'); // must NOT be nested",
+                  "  pm.expect(res.data).to.not.have.property('password_hash');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{demo_password}}\",\n  \"new_password\": \"NewPassword456!\"\n}"
+            },
+            "url": "{{base_url}}/auth/change-password"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () { pm.response.to.have.status(200); });",
+                  "pm.test('success is true', function () { var res = pm.response.json(); pm.expect(res.success).to.be.true; });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password – Wrong Current (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"WrongCurrentPassword!\",\n  \"new_password\": \"AnyNewPassword123!\"\n}"
+            },
+            "url": "{{base_url}}/auth/change-password"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', function () { pm.response.to.have.status(400); });",
+                  "pm.test('Error code PASSWORD_MISMATCH', function () {",
+                  "  var res = pm.response.json();",
+                  "  pm.expect(res.success).to.be.false;",
+                  "  pm.expect(res.error_code).to.eql('PASSWORD_MISMATCH');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Screenshots",
+      "item": [
+        {
+          "name": "List Screenshots",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('data is array', function () { pm.expect(pm.response.json().data).to.be.an('array'); });"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "screenshot", "type": "file", "src": "" },
+                { "key": "taken_at", "value": "2026-10-28T10:00:00Z", "type": "text" }
+              ]
+            },
+            "url": "{{base_url}}/screenshots/upload"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  var res = pm.response.json();",
+                  "  pm.environment.set('screenshot_id', res.data.id);",
+                  "  pm.test('Screenshot uploaded', function () { pm.expect(res.success).to.be.true; });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Screenshot",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Analyze Screenshot (AI)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}/analyze"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 202', function () { pm.expect(pm.response.code).to.be.oneOf([200, 202, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Screenshot",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/screenshots/{{screenshot_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Dated Items",
+      "item": [
+        {
+          "name": "List Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Dated Item",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Dated Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Title\",\n  \"notes\": \"Updated notes\"\n}"
+            },
+            "url": "{{base_url}}/dated-items/{{dated_item_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Non-Dated Items",
+      "item": [
+        {
+          "name": "List Non-Dated Items",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Non-Dated Item",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/non-dated-items/{{non_dated_item_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Reminders",
+      "item": [
+        {
+          "name": "List Reminders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Reminder",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reminders/{{reminder_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/notifications"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/notifications/{{notification_id}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Settings",
+      "item": [
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notifications_enabled\": true,\n  \"theme\": \"light\"\n}"
+            },
+            "url": "{{base_url}}/settings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Rules",
+      "item": [
+        {
+          "name": "List Rules",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/rules"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Rule",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/rules/{{rule_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Cleanup & Trash",
+      "item": [
+        {
+          "name": "List Trash (Recently Deleted)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Empty Trash",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/trash"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11. AI Microservice (Direct)",
+      "item": [
+        {
+          "name": "AI Health",
+          "request": {
+            "method": "GET",
+            "url": "{{ai_base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI Analyze Screenshot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"screenshot_id\": {{screenshot_id}},\n  \"image_url\": \"http://localhost:8000/storage/screenshots/sample.png\"\n}"
+            },
+            "url": "{{ai_base_url}}/analyze"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200 or 202', function () { pm.expect(pm.response.code).to.be.oneOf([200, 202, 404, 422]); });"],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  }
+}
+

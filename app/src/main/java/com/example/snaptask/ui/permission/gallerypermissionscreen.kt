@@ -1,5 +1,10 @@
 package com.example.snaptask.ui.permission
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -35,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.snaptask.R
 import com.example.snaptask.ui.components.SnapTaskPrimaryButton
 import com.example.snaptask.ui.theme.InterFamily
@@ -76,6 +83,43 @@ fun GalleryPermissionScreen(
     onDontAllow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val permissionsToRequest = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val hasAccess = results.values.any { it }
+        if (hasAccess) {
+            onAllow()
+        } else {
+            onDontAllow()
+        }
+    }
+
+    fun handleAllowClick() {
+        val hasAccess = permissionsToRequest.any {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (hasAccess) {
+            onAllow()
+        } else {
+            permissionLauncher.launch(permissionsToRequest)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -112,7 +156,7 @@ fun GalleryPermissionScreen(
                 Spacer(Modifier.weight(1f))
 
                 Text(
-                    text = "Permission request preview · no gallery accessed",
+                    text = "Permission required to access real screenshots",
                     style = SnapTaskType.Caption,
                     color = SnapTaskColors.TextSecondary,
                     textAlign = TextAlign.Center,
@@ -137,7 +181,7 @@ fun GalleryPermissionScreen(
 
         // Dialog
         PermissionDialog(
-            onAllow = onAllow,
+            onAllow = ::handleAllowClick,
             onDontAllow = onDontAllow,
             modifier = Modifier
                 .align(Alignment.Center)

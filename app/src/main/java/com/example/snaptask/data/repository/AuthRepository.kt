@@ -1,14 +1,19 @@
 package com.example.snaptask.data.repository
 
+import com.example.snaptask.data.local.AppDatabase
 import com.example.snaptask.data.local.PreferencesManager
 import com.example.snaptask.data.network.*
 import com.google.gson.JsonParser
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import retrofit2.Response
 
 class AuthRepository(
     private val apiService: ApiService,
     private val prefsManager: PreferencesManager,
+    private val database: AppDatabase,
 ) {
     suspend fun login(email: String, password: String): Resource<AuthResponse> {
         return try {
@@ -47,6 +52,16 @@ class AuthRepository(
             val errorJson = response.errorBody()?.string()
             if (!errorJson.isNullOrBlank()) {
                 val jsonObject = JsonParser.parseString(errorJson).asJsonObject
+                if (jsonObject.has("errors") && jsonObject.get("errors").isJsonObject) {
+                    val errorsObj = jsonObject.getAsJsonObject("errors")
+                    val firstKey = errorsObj.keySet().firstOrNull()
+                    if (firstKey != null) {
+                        val element = errorsObj.get(firstKey)
+                        if (element.isJsonArray && element.asJsonArray.size() > 0) {
+                            return element.asJsonArray.get(0).asString
+                        }
+                    }
+                }
                 if (jsonObject.has("message")) {
                     return jsonObject.get("message").asString
                 }
@@ -57,13 +72,25 @@ class AuthRepository(
         }
     }
 
+    /**
+     * Complete Unified Logout:
+     * 1. Calls backend logout/revoke endpoint (swallows network failures)
+     * 2. Clears stored tokens and preferences from DataStore
+     * 3. Clears Room database tables so user B never sees user A's screenshots
+     */
     suspend fun logout(): Resource<Unit> {
-        return try {
-            apiService.logout()
-            prefsManager.clearAuthData()
-            Resource.Success(Unit)
-        } catch (e: Exception) {
-            prefsManager.clearAuthData()
+        return withContext(Dispatchers.IO) {
+            try {
+                apiService.logout()
+            } catch (_: Exception) {
+                // Ignore network failure when revoking token on server
+            } finally {
+                prefsManager.clearAuthData()
+                try {
+                    database.clearAllTables()
+                } catch (_: Exception) {
+                }
+            }
             Resource.Success(Unit)
         }
     }
@@ -71,5 +98,7 @@ class AuthRepository(
     suspend fun isLoggedIn(): Boolean = prefsManager.isLoggedIn.first()
     suspend fun isOnboardingDone(): Boolean = prefsManager.onboardingDone.first()
     suspend fun setOnboardingDone() = prefsManager.setOnboardingDone()
+    suspend fun hasSeenIntro(): Boolean = prefsManager.introSeen.first()
+    suspend fun setIntroSeen() = prefsManager.setIntroSeen()
+    val introSeen: Flow<Boolean> = prefsManager.introSeen
 }
-
