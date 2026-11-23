@@ -2,11 +2,9 @@ package com.example.snaptask.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.example.snaptask.R
 
 object SnapTaskColors {
     val Background = Color(0xFFFAF6F0)
@@ -16,10 +14,7 @@ object SnapTaskColors {
     val Surface = Color.White
 }
 
-val AppFontFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-)
+val AppFontFamily = FontFamily.Default
 
 val InterFamily = AppFontFamily
 

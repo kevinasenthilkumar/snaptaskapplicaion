@@ -147,13 +147,13 @@ fun SettingsScreen(
                     NavRow(
                         icon = R.drawable.ic_row_list_checks,
                         title = "Cleanup rules",
-                        subtitle = "Dated +1 day · Non-dated +7 days",
+                        subtitle = "AI categorisation · Duplicate & recovery rules",
                         onClick = onOpenRules,
                     )
                     NavRow(
                         icon = R.drawable.ic_trash,
                         title = "Recently deleted",
-                        subtitle = "6 screenshots · 30-day recovery",
+                        subtitle = "30-day recovery safety net",
                         onClick = onOpenRecentlyDeleted,
                     )
                 }

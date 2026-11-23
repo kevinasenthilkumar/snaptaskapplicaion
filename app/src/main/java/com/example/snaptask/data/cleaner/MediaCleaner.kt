@@ -1,4 +1,4 @@
-﻿package com.example.snaptask.data.cleaner
+package com.example.snaptask.data.cleaner
 
 import android.content.Context
 import android.net.Uri
@@ -30,7 +30,42 @@ class MediaCleaner(
             launcher.launch(request)
             true
         } else {
-            false
+            var allDeleted = true
+            for (uri in uris) {
+                try {
+                    context.contentResolver.delete(uri, null, null)
+                } catch (_: Exception) {
+                    allDeleted = false
+                }
+            }
+            allDeleted
+        }
+    }
+
+    fun requestPermanentDelete(
+        uris: List<Uri>,
+        launcher: ActivityResultLauncher<IntentSenderRequest>,
+    ): Boolean {
+        if (uris.isEmpty()) return false
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val pendingIntent = MediaStore.createDeleteRequest(
+                context.contentResolver,
+                uris
+            )
+            val request = IntentSenderRequest.Builder(pendingIntent.intentSender).build()
+            launcher.launch(request)
+            true
+        } else {
+            var allDeleted = true
+            for (uri in uris) {
+                try {
+                    context.contentResolver.delete(uri, null, null)
+                } catch (_: Exception) {
+                    allDeleted = false
+                }
+            }
+            allDeleted
         }
     }
 
@@ -41,5 +76,13 @@ class MediaCleaner(
                 repository.deleteScreenshot(id)
             } catch (_: Exception) {}
         }
+    }
+
+    suspend fun onPermanentDeleteConfirmed(ids: List<Long>) = withContext(Dispatchers.IO) {
+        repository.deletePermanently(ids)
+    }
+
+    suspend fun onRestoreConfirmed(ids: List<Long>) = withContext(Dispatchers.IO) {
+        repository.restoreScreenshots(ids)
     }
 }

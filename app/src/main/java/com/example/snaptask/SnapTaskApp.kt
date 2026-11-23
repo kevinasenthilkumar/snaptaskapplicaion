@@ -162,6 +162,20 @@ fun SnapTaskApp() {
         }
     }
 
+    val permanentDeleteLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            if (pendingDeleteIds.isNotEmpty()) {
+                coroutineScope.launch {
+                    app.container.mediaCleaner.onPermanentDeleteConfirmed(pendingDeleteIds)
+                    pendingDeleteIds = emptyList()
+                    pendingDeleteCategoryName = null
+                }
+            }
+        }
+    }
+
     fun requestDeleteScreenshot(id: Long) {
         val target = allScreenshots.firstOrNull { it.id == id } ?: return
         pendingDeleteCategoryName = null
@@ -538,8 +552,30 @@ fun SnapTaskApp() {
             RecentlyDeletedScreen(
                 trashedItems = trashedItems,
                 onBack = { screen = Screen.Settings },
-                onRestoreAll = { screen = Screen.HomeDashboard },
-                onDeleteForever = { screen = Screen.HomeDashboard },
+                onRestoreAll = {
+                    val ids = trashedItems.map { it.id }
+                    if (ids.isNotEmpty()) {
+                        coroutineScope.launch {
+                            app.container.mediaCleaner.onRestoreConfirmed(ids)
+                        }
+                    }
+                    screen = Screen.Settings
+                },
+                onDeleteForever = {
+                    val ids = trashedItems.map { it.id }
+                    if (ids.isNotEmpty()) {
+                        val uris = trashedItems.map { Uri.parse(it.contentUri) }
+                        pendingDeleteIds = ids
+                        val launched = app.container.mediaCleaner.requestPermanentDelete(uris, permanentDeleteLauncher)
+                        if (!launched) {
+                            coroutineScope.launch {
+                                app.container.mediaCleaner.onPermanentDeleteConfirmed(ids)
+                                pendingDeleteIds = emptyList()
+                            }
+                        }
+                    }
+                    screen = Screen.Settings
+                },
                 onTabSelected = ::handleBottomTab,
             )
         }

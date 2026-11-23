@@ -366,10 +366,11 @@ private fun PreferenceRow(
 
 @Composable
 private fun StepPills() {
-    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+    ) {
         StepPill(label = "Overview", selected = true)
-        StepPill(label = "Dated", selected = false)
-        StepPill(label = "Non-dated", selected = false)
     }
 }
 

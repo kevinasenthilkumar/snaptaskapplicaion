@@ -1,4 +1,4 @@
-﻿package com.example.snaptask.data.local
+package com.example.snaptask.data.local
 
 import android.content.ContentValues
 import android.content.Context
@@ -144,11 +144,39 @@ class AppDatabase private constructor(context: Context) : SQLiteOpenHelper(conte
         ids
     }
 
+    suspend fun pruneMissingActive(validIds: Set<Long>) = withContext(Dispatchers.IO) {
+        val db = writableDatabase
+        if (validIds.isEmpty()) {
+            db.execSQL("DELETE FROM local_screenshots WHERE status = 'active'")
+        } else {
+            val placeholders = validIds.joinToString(",") { "?" }
+            val args = validIds.map { it.toString() }.toTypedArray()
+            db.execSQL("DELETE FROM local_screenshots WHERE id NOT IN ($placeholders) AND status = 'active'", args)
+        }
+        notifyDataChanged()
+    }
+
     suspend fun markAsTrashed(ids: List<Long>) = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext
         val placeholders = ids.joinToString(",") { "?" }
         val args = ids.map { it.toString() }.toTypedArray()
-        writableDatabase.execSQL("UPDATE local_screenshots SET status = 'trashed' WHERE id IN ()", args)
+        writableDatabase.execSQL("UPDATE local_screenshots SET status = 'trashed' WHERE id IN ($placeholders)", args)
+        notifyDataChanged()
+    }
+
+    suspend fun restoreFromTrash(ids: List<Long>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        val placeholders = ids.joinToString(",") { "?" }
+        val args = ids.map { it.toString() }.toTypedArray()
+        writableDatabase.execSQL("UPDATE local_screenshots SET status = 'active' WHERE id IN ($placeholders)", args)
+        notifyDataChanged()
+    }
+
+    suspend fun deletePermanently(ids: List<Long>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        val placeholders = ids.joinToString(",") { "?" }
+        val args = ids.map { it.toString() }.toTypedArray()
+        writableDatabase.execSQL("DELETE FROM local_screenshots WHERE id IN ($placeholders)", args)
         notifyDataChanged()
     }
 

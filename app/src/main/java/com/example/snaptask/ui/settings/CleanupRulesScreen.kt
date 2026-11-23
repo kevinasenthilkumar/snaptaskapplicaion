@@ -89,22 +89,22 @@ fun CleanupRulesScreen(
             ) {
                 Text(text = "Clear rules.\nNo surprises.", style = Heading, color = SnapTaskColors.TextPrimary)
 
-                // Dated Rule Card
+                // AI Categorisation Rule Card
                 RuleCard(
-                    icon = R.drawable.ic_nav_home,
-                    title = "Dated screenshots",
-                    subtitle = "Tickets, events and reservations",
-                    body = "Delete one day after the specified date. Notify on the specified date, one day before deletion.",
-                    example = "Example: event 16 Oct → notify 16 Oct → delete 17 Oct",
+                    icon = R.drawable.ic_sparkles_accent,
+                    title = "AI Categorisation",
+                    subtitle = "10 Predefined Library Categories",
+                    body = "Screenshots are classified using on-device text understanding into predefined folders. Screenshots that cannot be confidently classified remain in 'Other' for manual review.",
+                    example = "Categories: Tickets · Travel · Bills & Payments · Receipts & Orders · Shopping · Food & Recipes · Study & Notes · Chats & Social · Maps & Places · Other",
                 )
 
-                // Non-dated Rule Card
+                // Duplicate Screenshot Management Card
                 RuleCard(
-                    icon = R.drawable.ic_nav_library,
-                    title = "Non-dated screenshots",
-                    subtitle = "Products, ideas, recipes and receipts",
-                    body = "Delete seven days after being saved. Notify on day six, one day before deletion.",
-                    example = "Example: saved 10 Oct → notify 16 Oct → delete 17 Oct",
+                    icon = R.drawable.ic_row_shield_check,
+                    title = "Duplicate Management",
+                    subtitle = "Content & MediaStore Verification",
+                    body = "Identifies exact duplicate screenshots using stable MediaStore image IDs and file hashes. Duplicates are flagged for your review and never removed automatically without your consent.",
+                    example = "Protection: Identical duplicates detected · Similar images safely preserved",
                 )
 
                 // Protect Kept Card
@@ -151,7 +151,7 @@ fun CleanupRulesScreen(
                 }
 
                 Text(
-                    text = "Rules define eligibility. Automatic execution is a separate, explicit preference.",
+                    text = "Rules define categorization and cleanup suggestions. Deletions always require your explicit confirmation.",
                     style = SnapTaskType.Caption,
                     color = SnapTaskColors.TextSecondary,
                 )

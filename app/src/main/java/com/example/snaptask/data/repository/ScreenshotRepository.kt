@@ -220,6 +220,21 @@ class ScreenshotRepository(
         }
     }
 
+    suspend fun restoreScreenshots(ids: List<Long>) = withContext(Dispatchers.IO) {
+        database.restoreFromTrash(ids)
+        refreshFromDb()
+    }
+
+    suspend fun deletePermanently(ids: List<Long>) = withContext(Dispatchers.IO) {
+        database.deletePermanently(ids)
+        refreshFromDb()
+        for (id in ids) {
+            try {
+                deleteScreenshot(id)
+            } catch (_: Exception) {}
+        }
+    }
+
     suspend fun deleteScreenshot(id: Long): Resource<Unit> = safeApiCall { apiService.deleteScreenshot(id) }
     suspend fun getStats(): Resource<ScreenshotStatsDto> = safeApiCall { apiService.getScreenshotStats() }
 }
